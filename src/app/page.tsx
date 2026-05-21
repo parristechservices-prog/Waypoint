@@ -1,11 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
+  AlertTriangle,
   Anchor,
   BookOpen,
+  Brain,
   BriefcaseBusiness,
   Check,
   CircleCheck,
@@ -14,15 +18,22 @@ import {
   CloudFog,
   Compass,
   Copy,
+  ExternalLink,
+  Eye,
   Flag,
+  Footprints,
   HeartPulse,
   House,
   LayoutDashboard,
   Leaf,
+  ListChecks,
   Map as MapIcon,
+  Monitor,
   Mountain,
   NotebookPen,
   Pause,
+  PersonStanding,
+  PhoneCall,
   Play,
   Plus,
   RefreshCcw,
@@ -33,8 +44,25 @@ import {
   Sun,
   Timer,
 } from "lucide-react";
+import {
+  appliedProtocols,
+  briefingScope,
+  consolidatedPlan,
+  evidenceClassifications,
+  evidenceStrengthSummary,
+  guidelineControls,
+  limitations,
+  mechanismSections,
+  moderators,
+  operationalFeatures,
+  physicalControls,
+  practitionerConclusion,
+  revisionBasis,
+  sourceLinks,
+  suitableTaskCategories,
+} from "./downtimeContent";
 
-type AppSection = "hub" | "waypoint";
+type AppSection = "hub" | "waypoint" | "downtime";
 type WaypointView = "home" | "anchor" | "trail";
 type AnchorStep = "checkin" | "oneThing" | "protect";
 type TimerMode = "work" | "break";
@@ -50,6 +78,12 @@ type NervousOption = {
 };
 
 type TaskEntry = {
+  id: number;
+  time: string;
+  text: string;
+};
+
+type DowntimeStatusEntry = {
   id: number;
   time: string;
   text: string;
@@ -248,6 +282,39 @@ const initialTimer: TimerState = {
   breakMinutes: 5,
 };
 
+const downtimeLoopSteps = [
+  {
+    id: "channels",
+    label: "Check channels",
+    detail: "Phone, ticket queue, messages, and walk-ups.",
+    Icon: PhoneCall,
+  },
+  {
+    id: "status",
+    label: "Record status",
+    detail: "Leave a brief availability or progress line.",
+    Icon: ClipboardList,
+  },
+  {
+    id: "task",
+    label: "Short task",
+    detail: "Use a low-switching-cost learning or admin task.",
+    Icon: BookOpen,
+  },
+  {
+    id: "visual",
+    label: "Visual break",
+    detail: "Look about 20 feet away for 20 seconds.",
+    Icon: Eye,
+  },
+  {
+    id: "move",
+    label: "Move",
+    detail: "Change posture, walk, ankle pump, or calf raise.",
+    Icon: Footprints,
+  },
+] as const;
+
 export default function Home() {
   const [section, setSection] = useState<AppSection>("hub");
   const [waypointView, setWaypointView] = useState<WaypointView>("home");
@@ -285,8 +352,9 @@ export default function Home() {
               anchor={anchor}
               trail={trail}
               openWaypoint={openWaypoint}
+              openDowntime={() => setSection("downtime")}
             />
-          ) : (
+          ) : section === "waypoint" ? (
             <WaypointSection
               view={waypointView}
               setView={setWaypointView}
@@ -297,6 +365,8 @@ export default function Home() {
               trailHistory={trailHistory}
               setTrailHistory={setTrailHistory}
             />
+          ) : (
+            <DowntimeSection />
           )}
         </div>
       </div>
@@ -335,7 +405,7 @@ function AppHeader({
         </h1>
       </div>
 
-      <div className="grid grid-cols-2 gap-1 rounded-lg border border-[#dbe3e0] bg-white p-1 shadow-sm">
+      <div className="grid grid-cols-3 gap-1 rounded-lg border border-[#dbe3e0] bg-white p-1 shadow-sm">
         <button
           type="button"
           onClick={() => chooseSection("hub")}
@@ -347,6 +417,18 @@ function AppHeader({
         >
           <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />
           Growth Hub
+        </button>
+        <button
+          type="button"
+          onClick={() => chooseSection("downtime")}
+          className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition ${
+            section === "downtime"
+              ? "bg-[#1a2e4a] text-white"
+              : "text-[#38506b] hover:bg-[#eef4f3]"
+          }`}
+        >
+          <Activity className="h-4 w-4" aria-hidden="true" />
+          Downtime
         </button>
         <button
           type="button"
@@ -371,12 +453,14 @@ function HubSection({
   anchor,
   trail,
   openWaypoint,
+  openDowntime,
 }: {
   hub: HubState;
   setHub: (hub: HubState) => void;
   anchor: AnchorData;
   trail: TrailToday;
   openWaypoint: (view: WaypointView) => void;
+  openDowntime: () => void;
 }) {
   const terrain = trail.terrain ? terrainMap[trail.terrain] : null;
   const nervous = anchor.nervous
@@ -479,6 +563,18 @@ function HubSection({
               ) : null}
             </button>
           </div>
+          <div className="mt-4 rounded-lg border border-white/15 bg-white/[0.08] p-4 text-sm text-white/90">
+            <p className="font-semibold text-white">Occupational health briefing</p>
+            <p className="mt-2 text-white/80">
+              View the full Level 1 IT downtime and ergonomic briefing.
+            </p>
+            <Link
+              href="/briefing"
+              className="mt-4 inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-[#1a2e4a] transition hover:bg-[#f0f5f4]"
+            >
+              Open briefing
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -511,6 +607,51 @@ function HubSection({
           placeholder="One person, conversation, or repair worth making"
           onChange={(value) => updateHub("connectionMove", value)}
         />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+        <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#2a7d8e]">
+                Downtime Controls
+              </p>
+              <h2 className="mt-1 text-xl font-semibold">
+                Level 1 IT readiness plan
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-[#607286]">
+                A practical 30-minute loop for low-demand, interruptible support
+                time: channel check, status line, learning task, visual break,
+                and movement.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openDowntime}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1a2e4a] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#243f63]"
+            >
+              <Activity className="h-4 w-4" aria-hidden="true" />
+              Open controls
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="rounded-md bg-[#edf8fa] p-2 text-[#2a7d8e]">
+              <Monitor className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[#2a7d8e]">
+                Strongest controls
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[#607286]">
+                Posture variation, visual breaks, appropriate monitor position,
+                and short frequent display-screen breaks.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
@@ -562,6 +703,727 @@ function HubPrompt({
         className="mt-3 w-full resize-none rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-3 text-sm leading-6 outline-none transition placeholder:text-[#8a9aaa] focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
       />
     </label>
+  );
+}
+
+function DowntimeSection() {
+  return (
+    <section className="space-y-5">
+      <SectionHeading
+        icon={Activity}
+        label="Downtime Controls"
+        title="Level 1 IT readiness plan"
+        text="A practitioner briefing and usable work loop for display-screen exposure, sit-stand posture variation, static standing, and interrupt-driven low-demand monitoring."
+      />
+
+      <div className="rounded-lg border border-[#e7c7bc] bg-[#fff7f2] p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="rounded-md bg-white p-2 text-[#9d5338]">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#9d5338]">
+              Applied occupational-health analysis, not a diagnosis
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[#5d6f82]">
+              Use this as a work-design and self-management aid. Persistent
+              visual symptoms, headaches, lower-limb swelling, neurological
+              symptoms, chest pain, marked distress, or functional deterioration
+              warrant medical or occupational-health review.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_0.85fr]">
+        <DowntimeLoopPlanner />
+        <DowntimePlanCard />
+      </div>
+
+      <AppliedProtocolCards />
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ControlsPanel
+          icon={Monitor}
+          title="Guideline-supported controls"
+          controls={guidelineControls}
+        />
+        <ControlsPanel
+          icon={PersonStanding}
+          title="Evidence-aligned physical controls"
+          controls={physicalControls}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[0.8fr_1fr]">
+        <BriefingScopeCard />
+        <OperationalDefinitionCard />
+      </div>
+
+      <EvidenceClassificationCard />
+      <MechanismGrid />
+      <ModeratorTable />
+      <EvidenceSummaryTable />
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+        <LimitationsCard />
+        <PractitionerConclusionCard />
+      </div>
+
+      <SourcesCard />
+    </section>
+  );
+}
+
+function DowntimeLoopPlanner() {
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [statusText, setStatusText] = useState(
+    "Queue checked; no assigned tickets; available for incoming support.",
+  );
+  const [statusLog, setStatusLog] = useState<DowntimeStatusEntry[]>([]);
+  const [copied, setCopied] = useState(false);
+  const completion = Math.round(
+    (completedSteps.length / downtimeLoopSteps.length) * 100,
+  );
+
+  function toggleStep(stepId: string) {
+    setCompletedSteps((current) =>
+      current.includes(stepId)
+        ? current.filter((id) => id !== stepId)
+        : [...current, stepId],
+    );
+  }
+
+  function addStatusLine() {
+    const text = statusText.trim();
+    if (!text) {
+      return;
+    }
+
+    setStatusLog([
+      { id: Date.now(), time: formatTimeOfDay(new Date()), text },
+      ...statusLog,
+    ]);
+    setCompletedSteps((current) =>
+      current.includes("status") ? current : [...current, "status"],
+    );
+  }
+
+  async function copyStatusLog() {
+    const text = statusLog
+      .slice()
+      .reverse()
+      .map((item) => `${item.time} - ${item.text}`)
+      .join("\n");
+
+    if (!text) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+            <h3 className="text-lg font-semibold">
+              30-minute readiness loop
+            </h3>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[#607286]">
+            Keep availability visible while turning low-demand time into short,
+            interruptible work.
+          </p>
+        </div>
+        <span className="rounded-md bg-[#eef4f3] px-3 py-2 text-sm font-semibold text-[#2a7d8e]">
+          {completion}% complete
+        </span>
+      </div>
+
+      <div className="mt-5 h-2 rounded-full bg-[#eef4f3]">
+        <div
+          className="h-2 rounded-full bg-[#2a7d8e] transition-all"
+          style={{ width: `${completion}%` }}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {downtimeLoopSteps.map((step) => {
+          const Icon = step.Icon;
+          const isComplete = completedSteps.includes(step.id);
+
+          return (
+            <button
+              key={step.id}
+              type="button"
+              onClick={() => toggleStep(step.id)}
+              className={`rounded-lg border p-4 text-left transition ${
+                isComplete
+                  ? "border-[#2a7d8e] bg-[#edf8fa]"
+                  : "border-[#dbe3e0] bg-[#fbfcfb] hover:border-[#9fcbd2]"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+                  <Icon className="h-4 w-4 flex-none text-[#2a7d8e]" />
+                  {step.label}
+                </span>
+                {isComplete ? (
+                  <Check className="h-4 w-4 flex-none text-[#2a7d8e]" />
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs leading-5 text-[#607286]">
+                {step.detail}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 border-t border-[#e4ebe8] pt-5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold">Status line</p>
+          <button
+            type="button"
+            onClick={() => setCompletedSteps([])}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#dbe3e0] text-[#607286] transition hover:bg-[#eef4f3]"
+            aria-label="Reset readiness loop"
+            title="Reset loop"
+          >
+            <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <input
+            value={statusText}
+            onChange={(event) => setStatusText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                addStatusLine();
+              }
+            }}
+            className="min-w-0 flex-1 rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-3 text-sm outline-none placeholder:text-[#8a9aaa] focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+          />
+          <button
+            type="button"
+            onClick={addStatusLine}
+            aria-label="Add status line"
+            className="inline-flex h-12 w-12 items-center justify-center rounded-md bg-[#2a7d8e] text-white transition hover:bg-[#246b79]"
+          >
+            <Plus className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-[#607286]">
+          Example: Queue checked; no assigned tickets; completed professional
+          development task.
+        </p>
+      </div>
+
+      <div className="mt-5 rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold">Availability log</p>
+          <button
+            type="button"
+            onClick={copyStatusLog}
+            disabled={statusLog.length === 0}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#dbe3e0] text-[#607286] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Copy availability log"
+            title={copied ? "Copied" : "Copy"}
+          >
+            <Copy className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+          {statusLog.length === 0 ? (
+            <p className="text-sm leading-6 text-[#607286]">
+              Status lines will appear here for end-of-day evidence.
+            </p>
+          ) : (
+            statusLog.map((item) => (
+              <div
+                key={item.id}
+                className="grid grid-cols-[4.75rem_1fr] gap-3 border-t border-[#e4ebe8] pt-2 text-sm first:border-t-0 first:pt-0"
+              >
+                <span className="font-mono text-xs font-semibold text-[#8a9aaa]">
+                  {item.time}
+                </span>
+                <span className="leading-5">{item.text}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DowntimePlanCard() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Clock className="h-5 w-5 text-[#e07b39]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Consolidated control plan</h3>
+      </div>
+      <div className="mt-5 space-y-4">
+        {consolidatedPlan.map((plan) => (
+          <div key={plan.cadence} className="border-t border-[#e4ebe8] pt-4 first:border-t-0 first:pt-0">
+            <p className="text-sm font-semibold text-[#2a7d8e]">
+              {plan.cadence}
+            </p>
+            <ul className="mt-2 space-y-2">
+              {plan.steps.map((step) => (
+                <li key={step} className="flex gap-2 text-sm leading-6 text-[#607286]">
+                  <Check className="mt-1 h-4 w-4 flex-none text-[#2a7d8e]" aria-hidden="true" />
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AppliedProtocolCards() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      {appliedProtocols.map((protocol) => (
+        <div
+          key={protocol.title}
+          className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm"
+        >
+          <ClassificationPill label={protocol.classification} />
+          <h3 className="mt-3 text-lg font-semibold">{protocol.title}</h3>
+          <ul className="mt-4 space-y-2">
+            {protocol.steps.map((step) => (
+              <li key={step} className="text-sm leading-6 text-[#607286]">
+                {step}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 border-t border-[#e4ebe8] pt-4 text-sm leading-6 text-[#5d6f82]">
+            {protocol.rationale}
+          </p>
+          <p className="mt-3 text-xs leading-5 text-[#607286]">
+            {protocol.alternative}
+          </p>
+        </div>
+      ))}
+      <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm lg:col-span-3">
+        <div className="flex items-center gap-2">
+          <Brain className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+          <h3 className="text-lg font-semibold">
+            Suitable low-switching-cost tasks
+          </h3>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {suitableTaskCategories.map((task) => (
+            <span
+              key={task}
+              className="rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-2 text-sm font-semibold text-[#607286]"
+            >
+              {task}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ControlsPanel({
+  icon: Icon,
+  title,
+  controls,
+}: {
+  icon: LucideIcon;
+  title: string;
+  controls: {
+    title: string;
+    control: string;
+    classification: string;
+    limitation?: string;
+    note?: string;
+    sourceIds: readonly string[];
+  }[];
+}) {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Icon className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">{title}</h3>
+      </div>
+      <div className="mt-5 space-y-5">
+        {controls.map((control) => (
+          <div key={control.title} className="border-t border-[#e4ebe8] pt-5 first:border-t-0 first:pt-0">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <h4 className="text-base font-semibold">{control.title}</h4>
+              <ClassificationPill label={control.classification} />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-[#607286]">
+              {control.control}
+            </p>
+            <p className="mt-3 text-xs leading-5 text-[#607286]">
+              {control.limitation || control.note}
+            </p>
+            <SourceBadges sourceIds={control.sourceIds} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BriefingScopeCard() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <ClipboardList className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Scope and revision basis</h3>
+      </div>
+      <p className="mt-4 text-sm leading-6 text-[#607286]">
+        This briefing evaluates a Level 1 IT support work pattern involving:
+      </p>
+      <ul className="mt-3 space-y-2">
+        {briefingScope.map((item) => (
+          <li key={item} className="flex gap-2 text-sm leading-6 text-[#607286]">
+            <Check className="mt-1 h-4 w-4 flex-none text-[#2a7d8e]" aria-hidden="true" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 border-t border-[#e4ebe8] pt-4">
+        <p className="text-sm font-semibold">Round 3 corrections</p>
+        <ul className="mt-2 space-y-2">
+          {revisionBasis.map((item) => (
+            <li key={item} className="text-sm leading-6 text-[#607286]">
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function OperationalDefinitionCard() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Activity className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">
+          Interrupt-driven low-demand monitoring
+        </h3>
+      </div>
+      <p className="mt-4 text-sm leading-6 text-[#607286]">
+        A work state with externally triggered work, low or irregular signal
+        frequency, preserved availability, periodic channel checking, and
+        readiness without full recovery.
+      </p>
+      <div className="mt-5 divide-y divide-[#e4ebe8] rounded-lg border border-[#e4ebe8]">
+        {operationalFeatures.map((feature) => (
+          <div key={feature.parameter} className="grid gap-1 p-3 sm:grid-cols-[0.45fr_1fr]">
+            <p className="text-sm font-semibold">{feature.parameter}</p>
+            <p className="text-sm leading-6 text-[#607286]">
+              {feature.definition}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-sm leading-6 text-[#607286]">
+        This construct is adjacent to, but not equivalent to, classic vigilance
+        decrement. Transfer from sustained-attention research to IT support
+        should be treated as partial and indirect.
+      </p>
+      <SourceBadges sourceIds={["frontiers"]} />
+    </div>
+  );
+}
+
+function EvidenceClassificationCard() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Shield className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Evidence classification</h3>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        {evidenceClassifications.map((item) => (
+          <div
+            key={item.classification}
+            className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4"
+          >
+            <ClassificationPill label={item.classification} />
+            <p className="mt-3 text-sm leading-6 text-[#607286]">
+              {item.meaning}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MechanismGrid() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <HeartPulse className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">
+          Physiological, psychological, and cognitive mechanisms
+        </h3>
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        {mechanismSections.map((section) => (
+          <article
+            key={section.title}
+            className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4"
+          >
+            <h4 className="text-base font-semibold">{section.title}</h4>
+            <div className="mt-3 space-y-3">
+              {section.body.map((paragraph) => (
+                <p key={paragraph} className="text-sm leading-6 text-[#607286]">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+            <div className="mt-4 border-t border-[#e4ebe8] pt-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a9aaa]">
+                Evidence classification
+              </p>
+              <ul className="mt-2 space-y-1">
+                {section.evidence.map((item) => (
+                  <li key={item} className="text-xs leading-5 text-[#607286]">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <SourceBadges sourceIds={section.sourceIds} />
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ModeratorTable() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Route className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">
+          Confounding and moderating variables
+        </h3>
+      </div>
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr className="bg-[#eef4f3] text-[#38506b]">
+              <th className="rounded-l-md px-3 py-3 font-semibold">Domain</th>
+              <th className="px-3 py-3 font-semibold">Risk-amplifying variables</th>
+              <th className="rounded-r-md px-3 py-3 font-semibold">Risk-reducing variables</th>
+            </tr>
+          </thead>
+          <tbody>
+            {moderators.map((row) => (
+              <tr key={row.domain} className="border-b border-[#e4ebe8]">
+                <td className="border-b border-[#e4ebe8] px-3 py-3 font-semibold">
+                  {row.domain}
+                </td>
+                <td className="border-b border-[#e4ebe8] px-3 py-3 leading-6 text-[#607286]">
+                  {row.amplifying}
+                </td>
+                <td className="border-b border-[#e4ebe8] px-3 py-3 leading-6 text-[#607286]">
+                  {row.reducing}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-4 text-sm leading-6 text-[#607286]">
+        WorkSafe Queensland&apos;s sit-stand workstation advice is kept separate from
+        Safe Work Australia&apos;s national guidance against prolonged seated,
+        standing, or static postures.
+      </p>
+      <SourceBadges sourceIds={["worksafe-qld", "safe-work-australia"]} />
+    </div>
+  );
+}
+
+function EvidenceSummaryTable() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <BookOpen className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Evidence-strength summary</h3>
+      </div>
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr className="bg-[#eef4f3] text-[#38506b]">
+              <th className="rounded-l-md px-3 py-3 font-semibold">Control</th>
+              <th className="px-3 py-3 font-semibold">Classification</th>
+              <th className="rounded-r-md px-3 py-3 font-semibold">Evidence status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {evidenceStrengthSummary.map((row) => (
+              <tr key={row.control}>
+                <td className="border-b border-[#e4ebe8] px-3 py-3 font-semibold">
+                  {row.control}
+                </td>
+                <td className="border-b border-[#e4ebe8] px-3 py-3">
+                  <ClassificationPill label={row.classification} />
+                </td>
+                <td className="border-b border-[#e4ebe8] px-3 py-3 leading-6 text-[#607286]">
+                  {row.status}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-4 rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4 text-sm leading-6 text-[#607286]">
+        Mechanistic versus outcome evidence note: a control can be
+        mechanistically plausible without strong direct evidence for clinical
+        outcome improvement at a specified dose. Lower-limb activation during
+        standing is mechanism-aligned; it is not proof of quantified symptom
+        reduction in every worker.
+      </p>
+    </div>
+  );
+}
+
+function LimitationsCard() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-5 w-5 text-[#e07b39]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Limitations</h3>
+      </div>
+      <ol className="mt-5 space-y-3">
+        {limitations.map((limitation, index) => (
+          <li key={limitation} className="grid grid-cols-[2rem_1fr] gap-2 text-sm leading-6 text-[#607286]">
+            <span className="font-mono text-xs font-semibold text-[#8a9aaa]">
+              {index + 1}.
+            </span>
+            <span>{limitation}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function PractitionerConclusionCard() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-[#1a2e4a] p-5 text-white shadow-sm">
+      <div className="flex items-center gap-2">
+        <Shield className="h-5 w-5 text-[#bfe6eb]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Practitioner conclusion</h3>
+      </div>
+      <div className="mt-5 space-y-4">
+        {practitionerConclusion.map((paragraph) => (
+          <p key={paragraph} className="text-sm leading-6 text-white/75">
+            {paragraph}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SourcesCard() {
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <ExternalLink className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Sources</h3>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        {sourceLinks.map((source) => (
+          <a
+            key={source.id}
+            href={source.url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4 transition hover:border-[#9fcbd2]"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold text-[#2a7d8e]">
+              {source.label}
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+            <span className="mt-1 block text-sm leading-6 text-[#607286]">
+              {source.title}
+            </span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ClassificationPill({ label }: { label: string }) {
+  const tone = label.includes("Guideline")
+    ? "border-[#a9d7de] bg-[#edf8fa] text-[#2a7d8e]"
+    : label.includes("Evidence")
+      ? "border-[#edc1a7] bg-[#fff5ed] text-[#b45f2f]"
+      : label.includes("Expert")
+        ? "border-[#bec9d5] bg-[#eef4f3] text-[#38506b]"
+        : "border-[#dbe3e0] bg-[#fbfcfb] text-[#607286]";
+
+  return (
+    <span
+      className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold ${tone}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function SourceBadges({
+  sourceIds,
+}: {
+  sourceIds?: readonly string[];
+}) {
+  if (!sourceIds?.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      {sourceIds.map((sourceId) => {
+        const source = sourceLinks.find((item) => item.id === sourceId);
+        if (!source) {
+          return null;
+        }
+
+        return (
+          <a
+            key={source.id}
+            href={source.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-[#dbe3e0] bg-white px-2 py-1 text-xs font-semibold text-[#607286] transition hover:border-[#9fcbd2] hover:text-[#2a7d8e]"
+          >
+            {source.label}
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+          </a>
+        );
+      })}
+    </div>
   );
 }
 
