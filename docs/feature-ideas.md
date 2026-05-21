@@ -125,32 +125,34 @@ This document captures 10 new feature ideas for the Waypoint app and includes pr
 
 ## 10 cool new feature ideas
 
-1. **Downtime Workflow Builder**
-   - Let users create and save custom 30-minute downtime loops from the briefing content (check channels, status line, task, visual break, movement).
+Paused the push. Here are 10 feature ideas that would fit Waypoint well:
 
-2. **Smart Reminder System**
-   - Add configurable reminders for posture changes, visual breaks, status updates, and walking intervals.
+1. **Downtime Loop Timer**
+   A guided 30-minute cycle that steps through channel check, status line, learning task, visual break, and movement.
 
-3. **Daily Rhythm Dashboard**
-   - Visualise how often users switch posture, log tasks, and complete focus cycles over days/weeks.
+2. **One-Click Status Log Templates**
+   Preset lines like “Queue checked; no assigned tickets; available for support” with quick edit before saving.
 
-4. **Task Microlearning Library**
-   - Offer a curated menu of short low-switching-cost learning tasks (e.g. “React practice”, “ticket-note writing”, “cyber-safety reading”).
+3. **End-of-Day Work Evidence Report**
+   Automatically compiles task logs, status lines, skills practised, and unresolved items into a copyable summary.
 
-5. **Status Line Journal**
-   - Capture quick availability/status lines and auto-organise them as a work log for later review.
+4. **Posture & Eye Break Nudges**
+   Gentle reminders for 20-20-20 eye breaks, posture changes, walking, ankle pumps, and hydration.
 
-6. **Ergonomics Checklist**
-   - Add a guided monitor-and-workstation setup checklist with prompts for height, distance, lighting, and footwear.
+5. **Learning Questlines**
+   Turn professional development into small tracks: Microsoft 365, React, ticket writing, cyber safety, communication scripts.
 
-7. **Evidence & Reference Hub**
-   - Create a built-in source library that links briefing sections to the cited guidance and research sources.
+6. **Personal Pattern Insights**
+   Show weekly trends: best focus times, common low-energy periods, missed breaks, repeated blockers, completed learning themes.
 
-8. **Personalised Wellbeing Coach**
-   - Recommend controls based on current state: “static standing risk”, “low cognitive load”, “visual fatigue”.
+7. **Interrupt-Friendly Task Board**
+   A small menu of approved low-switching-cost tasks that can be paused instantly when calls or tickets arrive.
 
-9. **Exportable Summary Report**
-   - Generate a PDF or text summary of the day’s anchor, task log, downtime controls used, and end-of-day reflections.
+8. **Wellbeing Risk Check-In**
+   A quick daily scan for sleep, hydration, visual discomfort, leg fatigue, stress, and workload ambiguity.
 
-10. **Collaboration / Sharing Mode**
-    - Allow users to share a daily wellbeing plan or status update with a manager, coach, or teammate via link or clipboard export.
+9. **Manager-Ready Transparency Mode**
+   A clean, professional view/export showing availability checks and productive downtime use without personal reflection content.
+
+10. **Local Save & History**
+   Persist anchors, trail logs, downtime loops, and daily summaries locally so Waypoint becomes a real longitudinal companion instead of a single-session tool.
