@@ -1,42 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Waypoint
 
-## Getting Started
+Waypoint is a local-first professional growth, wellbeing, and reflection hub built with Next.js. It supports daily anchoring, focused work evidence, downtime readiness loops for Level 1 IT support, occupational-health controls, and lightweight reflection history.
 
-First, run the development server:
+## App Areas
+
+- **Growth Hub**: daily capacity, growth focus, wellbeing guardrail, learning move, connection move, connected apps, and contextual next action.
+- **Downtime Controls**: readiness workflow timer, status-line journal, reminders, rhythm dashboard, microlearning tasks, interrupt-friendly task board, ergonomics checklist, learning questlines, wellbeing coach, reports, local history, and expandable evidence details.
+- **Waypoint**: daily home dashboard, Anchor flow, Focus Block timer, task log, End of Day card, Trail terrain, pace check, Examen, and Trail Log.
+
+## Recent QA Improvements
+
+The latest implementation pass focused on the QA report in `docs/qa-improvement-log.md`:
+
+- Added edit/delete controls for status lines and task log entries.
+- Added anchor edit/reset controls.
+- Added Full Day card edit/clear controls.
+- Added clearer Focus Block Timer guidance and labeled controls.
+- Added non-colour selected indicators and explanatory text for Trail terrain and pace choices.
+- Added clear/delete controls for saved trail reflections.
+- Collapsed long Downtime evidence content behind an expandable details section.
+- Expanded local snapshot restore to include more downtime and wellbeing state.
+- Documented remaining work in the QA improvement log.
+
+## Documentation
+
+- [Feature ideas and implementation guidance](./docs/feature-ideas.md)
+- [QA improvement log](./docs/qa-improvement-log.md)
+
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Validation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm lint
+pnpm build
+```
 
-## Learn More
+## Storage Model
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Feature ideas and implementation guidance
-
-A new feature guide has been added for the Waypoint app with practical notes for a vibe coder on how to implement each idea.
-
-- [Feature ideas and practical implementation guidance](./docs/feature-ideas.md)
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Waypoint currently stores user data in browser `localStorage`. This is intentional for a private, local-first prototype, but it means data is tied to the current browser profile unless export or sync is added later.
