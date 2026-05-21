@@ -1,147 +1,123 @@
-# Waypoint Feature Ideas
+# Waypoint Feature Ideas and Practical Implementation Guidance
 
-This document captures 10 feature ideas for Waypoint and gives practical implementation notes for a vibe coder. The goal is to keep each idea buildable in small steps, using the app's current Next.js structure, existing card UI, local state patterns, and the downtime guidance already in `src/app/downtimeContent.ts`.
+This document captures the 20 requested Waypoint feature ideas in top-to-bottom order. Each item includes practical notes for a vibe coder and the first implementation surface now used in the app.
 
-## 1. Downtime Loop Timer
+## 1. Downtime Workflow Builder
 
-**Cool feature**
-- A guided 30-minute cycle that steps through channel check, status line, learning task, visual break, and movement.
+- Lets users build a custom low-demand loop from briefing steps.
+- Implemented through `DowntimeLoopPlanner` in `src/app/page.tsx`.
+- Practical build path: model steps as `{ id, label, description, duration, enabled }`, render editable cards, allow up/down reordering, and persist the loop with `localStorage`.
 
-**How a vibe coder can practically implement it**
-- Start inside the existing `DowntimeLoopPlanner` in `src/app/page.tsx`.
-- Add a local `currentStepIndex` state and a `secondsLeft` state.
-- Reuse the existing `monitoringLoop` data from `src/app/downtimeContent.ts` so the timer follows the briefing-backed sequence.
-- Add Start, Pause, Reset, and Skip buttons with lucide icons.
-- When a step finishes, automatically mark the matching checklist item complete and advance to the next step.
-- Keep the first version client-only. No database is needed.
+## 2. Smart Reminder System
 
-## 2. One-Click Status Log Templates
+- Sends periodic prompts for posture changes, visual breaks, status updates, and walking intervals.
+- Implemented through `SmartReminderSystem`.
+- Practical build path: keep reminder settings as local state, run `window.setInterval` for enabled reminders, and show in-app alert cards before adding browser notifications.
 
-**Cool feature**
-- Preset lines like "Queue checked; no assigned tickets; available for support" with quick edit before saving.
+## 3. Daily Rhythm Dashboard
 
-**How a vibe coder can practically implement it**
-- Create a `statusTemplates` array with strings such as queue checked, ticket complete, learning block complete, and waiting on user.
-- Render the templates as small buttons above the status input in `DowntimeLoopPlanner`.
-- On click, set the current status input value instead of immediately saving it.
-- Keep the input editable so the user can tailor the line before adding it to the log.
-- Add a "recent templates" option later by storing the last few custom lines in `localStorage`.
+- Visualises posture switches, task logs, completed cycles, breaks, and movement over today or seven days.
+- Implemented through `DailyRhythmDashboard`.
+- Practical build path: store simple event objects, filter by date range, and render pure CSS bars before adding a chart library.
 
-## 3. End-of-Day Work Evidence Report
+## 4. Task Microlearning Library
 
-**Cool feature**
-- Automatically compiles task logs, status lines, skills practised, and unresolved items into a copyable summary.
+- Offers short low-switching-cost learning tasks.
+- Implemented through `TaskMicrolearningLibrary` and `src/app/data/task-library.ts`.
+- Practical build path: keep the first task library static, render cards, and add chosen exercises directly to the existing task log.
 
-**How a vibe coder can practically implement it**
-- Add a `Generate report` button near `EndOfDay` or inside the downtime section.
-- Build a helper like `buildDayReport(anchor, statusLog, hub)` that returns a Markdown string.
-- Include sections for one thing, protected boundary, task log, downtime status log, skill practised, useful action, and unresolved items.
-- Use `navigator.clipboard.writeText(report)` for the first version.
-- For a downloadable file, create a Blob and trigger a download with `URL.createObjectURL`.
-- Keep manager-facing evidence separate from personal reflection fields.
+## 5. Status Line Journal
 
-## 4. Posture and Eye Break Nudges
+- Captures availability/status lines as a work diary.
+- Implemented inside `DowntimeLoopPlanner`.
+- Practical build path: keep a timestamped `statusLog`, render newest first, add copy-to-clipboard, and expose one-click templates.
 
-**Cool feature**
-- Gentle reminders for 20-20-20 eye breaks, posture changes, walking, ankle pumps, calf raises, and hydration.
+## 6. Ergonomics Checklist
 
-**How a vibe coder can practically implement it**
-- Create a `useNudgeTimer` hook that accepts an interval, label, and enabled flag.
-- Add toggles for visual break, posture change, movement, and hydration.
-- Use in-app alert cards first; browser notifications can come later because they need permission handling.
-- Keep default intervals simple: 20 minutes for visual break, 30 minutes for posture change, 60 minutes for lower-limb movement.
-- Store nudge preferences in `localStorage`.
-- Use the briefing labels from `downtimeContent.ts` so the language stays consistent.
+- Guides monitor height, screen distance, lighting, footwear, posture, and laptop setup.
+- Implemented through `ErgonomicsChecklist`.
+- Practical build path: model checklist items with `id`, `label`, and `detail`, store completion locally, and keep each item actionable.
 
-## 5. Learning Questlines
+## 7. Evidence & Reference Hub
 
-**Cool feature**
-- Turn professional development into small tracks: Microsoft 365, React, ticket writing, cyber safety, communication scripts, and troubleshooting drills.
+- Groups briefing sources into a quick reference library.
+- Implemented through `EvidenceReferenceHub`.
+- Practical build path: reuse `sourceLinks` from `src/app/downtimeContent.ts`, group sources by use case, and open links in new tabs.
 
-**How a vibe coder can practically implement it**
-- Create a data file such as `src/app/learningQuestlines.ts`.
-- Model each questline with `id`, `title`, `description`, `tasks`, `estimatedMinutes`, and `tags`.
-- Render questlines as cards in the Downtime section or Growth Hub.
-- Let the user mark each micro-task complete with a checkbox.
-- Add an `Add to task log` button that creates a normal task log entry from the selected micro-task.
-- Start with static data. Add persistence only after the UI feels useful.
+## 8. Personalised Wellbeing Coach
 
-## 6. Personal Pattern Insights
+- Recommends controls based on current state and risk inputs.
+- Implemented through `WellbeingCoach`.
+- Practical build path: write a small rules engine over anchor, trail, status log, events, and wellbeing sliders; return two or three cue cards.
 
-**Cool feature**
-- Show weekly trends: best focus times, common low-energy periods, missed breaks, repeated blockers, and completed learning themes.
+## 9. Exportable Summary Report
 
-**How a vibe coder can practically implement it**
-- Define a small event model: `type WaypointEvent = { id, type, timestamp, label }`.
-- Log events when the user completes loops, saves status lines, records tasks, changes posture, or saves reflections.
-- Store events in `localStorage` grouped by date.
-- Build a simple `InsightsPanel` with counts first: loops completed, logs added, movement blocks completed, and breaks missed.
-- Add lightweight charts later using CSS bars before bringing in a chart library.
-- Keep insights descriptive, not diagnostic.
+- Creates a shareable day summary from anchor, task log, downtime controls, and reflections.
+- Implemented through `ReportAndSharingPanel`.
+- Practical build path: generate Markdown from current state, support copy-to-clipboard, and download via `Blob` plus `URL.createObjectURL`.
 
-## 7. Interrupt-Friendly Task Board
+## 10. Collaboration / Sharing Mode
 
-**Cool feature**
-- A small menu of approved low-switching-cost tasks that can be paused instantly when calls or tickets arrive.
+- Shares a daily wellbeing plan or status update by clipboard or email draft.
+- Implemented through `ReportAndSharingPanel`.
+- Practical build path: use the same generated report text, add a `mailto:` link, and keep the first version local-first.
 
-**How a vibe coder can practically implement it**
-- Reuse `suitableTaskCategories` from `src/app/downtimeContent.ts` as the starting list.
-- Add a `TaskBoard` component with columns like Learn, Apply, Write, Check, and Reset.
-- Give every task a short estimated duration and a clear "pause point".
-- Add buttons for Start, Pause, Done, and Log.
-- When a task is marked Done, add a task log entry automatically.
-- Keep tasks small enough that interruptibility is real, not just claimed.
+## 11. Downtime Loop Timer
 
-## 8. Wellbeing Risk Check-In
+- Runs the custom readiness loop as a guided timer.
+- Implemented in the workflow builder area of `DowntimeLoopPlanner`.
+- Practical build path: store `currentStepIndex`, `secondsLeft`, and `timerRunning`; auto-advance or reset after each enabled step.
 
-**Cool feature**
-- A quick daily scan for sleep, hydration, visual discomfort, leg fatigue, stress, workload ambiguity, and recovery state.
+## 12. One-Click Status Log Templates
 
-**How a vibe coder can practically implement it**
-- Create a `WellbeingRiskCheck` component with 5 to 7 slider or segmented-control questions.
-- Use plain labels like Sleep, Hydration, Eyes, Legs, Stress, and Clarity.
-- Map responses to low, medium, or high support needs.
-- Show one practical recommendation from the existing controls: visual break, posture change, walking interval, water refill, or expectation clarification.
-- Keep the result private by default and do not mix it into manager-facing reports.
-- Persist only today's check-in at first.
+- Provides preset availability/status lines with quick edit before saving.
+- Implemented inside `DowntimeLoopPlanner`.
+- Practical build path: keep a `statusTemplates` array, render small buttons, and set the editable status input on click.
 
-## 9. Manager-Ready Transparency Mode
+## 13. End-of-Day Work Evidence Report
 
-**Cool feature**
-- A clean, professional view/export showing availability checks and productive downtime use without personal reflection content.
+- Compiles task logs, status lines, skills practised, and unresolved items.
+- Implemented as the manager-ready report mode in `ReportAndSharingPanel`.
+- Practical build path: keep personal reflection separate from work evidence and build reports with dedicated helper functions.
 
-**How a vibe coder can practically implement it**
-- Add a `TransparencyReport` component that only reads work-safe fields: status logs, task logs, learning tasks, completed loops, and unresolved work.
-- Exclude nervous-system check-ins, Trail reflections, and personal wellbeing notes.
-- Add a toggle called `Manager-ready` near the report generator.
-- Build the output as Markdown with timestamps and concise headings.
-- Add copy-to-clipboard first, then PDF or print view later.
-- Make the privacy boundary obvious in code by keeping personal and work-report fields in separate helper functions.
+## 14. Posture & Eye Break Nudges
 
-## 10. Local Save and History
+- Adds gentle reminders for visual breaks, posture changes, walking, ankle pumps, and hydration.
+- Implemented through `SmartReminderSystem`.
+- Practical build path: ship in-app reminders first, then add browser notification permission handling later.
 
-**Cool feature**
-- Persist anchors, trail logs, downtime loops, and daily summaries locally so Waypoint becomes a real longitudinal companion instead of a single-session tool.
+## 15. Learning Questlines
 
-**How a vibe coder can practically implement it**
-- Create a hook like `useLocalStorageState<T>(key, initialValue)`.
-- Replace selected `useState` calls for `hub`, `anchor`, `trail`, and downtime status logs with the local-storage hook.
-- Version the saved object with a field like `schemaVersion: 1` so future migrations are possible.
-- Store entries by date, using a key such as `waypoint:days`.
-- Add a small History page or panel that lists previous days and lets the user reopen summaries.
-- Keep everything local-first before adding accounts, sync, or a database.
+- Turns professional development into small tracks.
+- Implemented through `LearningQuestlines`.
+- Practical build path: define static questlines, store completed task IDs in `localStorage`, and add progress entries to the task log.
 
-## Suggested Build Order
+## 16. Personal Pattern Insights
 
-1. One-click status log templates.
-2. Downtime loop timer.
-3. End-of-day work evidence report.
-4. Local save and history.
-5. Interrupt-friendly task board.
-6. Posture and eye break nudges.
-7. Learning questlines.
-8. Manager-ready transparency mode.
-9. Wellbeing risk check-in.
-10. Personal pattern insights.
+- Shows trends such as missed breaks, completed loops, and learning themes.
+- Implemented through `DailyRhythmDashboard`.
+- Practical build path: append events when key actions happen, group by date, and display counts before adding deeper analytics.
 
-This order gives the app more usefulness quickly while keeping technical risk low.
+## 17. Interrupt-Friendly Task Board
+
+- Gives tasks that can be paused instantly when calls or tickets arrive.
+- Implemented through `InterruptFriendlyTaskBoard`.
+- Practical build path: render start, pause, and done controls, define a clear pause point, and log completed tasks.
+
+## 18. Wellbeing Risk Check-In
+
+- Scans sleep, hydration, visual discomfort, leg fatigue, stress, and clarity.
+- Implemented through the sliders inside `WellbeingCoach`.
+- Practical build path: model each risk from 1 to 5 and use high scores to choose practical recommendations.
+
+## 19. Manager-Ready Transparency Mode
+
+- Exports availability and productive downtime use without personal reflection content.
+- Implemented through the manager-ready toggle in `ReportAndSharingPanel`.
+- Practical build path: separate work-safe report fields from private reflection fields in code.
+
+## 20. Local Save & History
+
+- Persists anchors, trail logs, downtime loops, status lines, and day summaries locally.
+- Implemented through `useLocalStorageState` and `LocalSaveHistory`.
+- Practical build path: store key state slices in `localStorage`, create day snapshots, and allow restoring a saved day.

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -54,6 +54,7 @@ import {
   limitations,
   mechanismSections,
   moderators,
+  monitoringLoop,
   operationalFeatures,
   physicalControls,
   practitionerConclusion,
@@ -61,6 +62,7 @@ import {
   sourceLinks,
   suitableTaskCategories,
 } from "./downtimeContent";
+import { taskLibrary } from "./data/task-library";
 
 type AppSection = "hub" | "waypoint" | "downtime";
 type WaypointView = "home" | "anchor" | "trail";
@@ -87,6 +89,82 @@ type DowntimeStatusEntry = {
   id: number;
   time: string;
   text: string;
+};
+
+type DowntimeEventType =
+  | "postureChange"
+  | "taskLogEntry"
+  | "breakTaken"
+  | "movementCycle"
+  | "statusLine"
+  | "loopComplete"
+  | "learningTask"
+  | "ergonomics"
+  | "reminder";
+
+type DowntimeEvent = {
+  id: number;
+  type: DowntimeEventType;
+  time: string;
+  dateKey: string;
+  label: string;
+};
+
+type WorkflowStep = {
+  id: string;
+  label: string;
+  description: string;
+  duration: number;
+  enabled: boolean;
+};
+
+type SavedWorkflow = {
+  id: number;
+  name: string;
+  steps: WorkflowStep[];
+};
+
+type ReminderKey = "posture" | "visual" | "status" | "movement";
+
+type ReminderSetting = {
+  label: string;
+  minutes: number;
+  enabled: boolean;
+  message: string;
+};
+
+type MicroTask = {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  minutes: number;
+};
+
+type ErgonomicChecklistItem = {
+  id: string;
+  label: string;
+  detail: string;
+};
+
+type WellbeingRisk = {
+  sleep: number;
+  hydration: number;
+  eyes: number;
+  legs: number;
+  stress: number;
+  clarity: number;
+};
+
+type DaySnapshot = {
+  id: number;
+  dateLabel: string;
+  anchor: AnchorData;
+  hub: HubState;
+  trail: TrailToday;
+  trailHistory: TrailEntry[];
+  statusLog: DowntimeStatusEntry[];
+  events: DowntimeEvent[];
 };
 
 type EndOfDay = {
@@ -315,20 +393,143 @@ const downtimeLoopSteps = [
   },
 ] as const;
 
+const defaultWorkflowSteps: WorkflowStep[] = [
+  {
+    id: "channels",
+    label: "Check channels",
+    description: "Phone, tickets, messages, and walk-ups.",
+    duration: 1,
+    enabled: true,
+  },
+  {
+    id: "status",
+    label: "Record status",
+    description: "Write one clear availability line.",
+    duration: 1,
+    enabled: true,
+  },
+  {
+    id: "task",
+    label: "Low-switching task",
+    description: "Professional development or light admin.",
+    duration: 18,
+    enabled: true,
+  },
+  {
+    id: "visual",
+    label: "Visual break",
+    description: "Look away from the display.",
+    duration: 1,
+    enabled: true,
+  },
+  {
+    id: "movement",
+    label: "Movement block",
+    description: "Walk, ankle pump, calf raise, or posture change.",
+    duration: 5,
+    enabled: true,
+  },
+];
+
+const defaultReminderSettings: Record<ReminderKey, ReminderSetting> = {
+  posture: {
+    label: "Posture change",
+    minutes: 30,
+    enabled: true,
+    message: "Change position: sit, stand, shift weight, or walk briefly.",
+  },
+  visual: {
+    label: "Visual break",
+    minutes: 20,
+    enabled: true,
+    message: "Look about 20 feet away for 20 seconds.",
+  },
+  status: {
+    label: "Status note",
+    minutes: 30,
+    enabled: false,
+    message: "Check channels and record an availability line.",
+  },
+  movement: {
+    label: "Walking interval",
+    minutes: 60,
+    enabled: true,
+    message: "Do a lower-limb movement interval or short walk.",
+  },
+};
+
+const statusTemplates = [
+  "Queue checked; no assigned tickets; available for incoming support.",
+  "Queue checked; no urgent items; continuing approved learning task.",
+  "Ticket completed; notes updated; available for next support request.",
+  "Messages checked; waiting on user response; remaining available.",
+  "Downtime loop completed; posture changed and visual break taken.",
+];
+
+const microTasks: MicroTask[] = taskLibrary;
+
+const ergonomicChecklist: ErgonomicChecklistItem[] = [
+  {
+    id: "monitor-height",
+    label: "Monitor height",
+    detail: "Top of monitor at or slightly below eye level.",
+  },
+  {
+    id: "screen-distance",
+    label: "Screen distance",
+    detail: "Screen about arm's length away and directly in front.",
+  },
+  {
+    id: "lighting",
+    label: "Lighting and glare",
+    detail: "Brightness, contrast, and ambient light are comfortable.",
+  },
+  {
+    id: "posture-variation",
+    label: "Posture variation",
+    detail: "Change posture about every 30 minutes where feasible.",
+  },
+  {
+    id: "footwear",
+    label: "Footwear and floor",
+    detail: "Supportive shoes and anti-fatigue mat where appropriate.",
+  },
+  {
+    id: "laptop-setup",
+    label: "Laptop setup",
+    detail: "Use separate monitor, keyboard, and mouse for extended work.",
+  },
+];
+
+const defaultWellbeingRisk: WellbeingRisk = {
+  sleep: 3,
+  hydration: 3,
+  eyes: 2,
+  legs: 2,
+  stress: 3,
+  clarity: 3,
+};
+
 export default function Home() {
   const [section, setSection] = useState<AppSection>("hub");
   const [waypointView, setWaypointView] = useState<WaypointView>("home");
-  const [hub, setHub] = useState<HubState>({
+  const [hub, setHub] = useLocalStorageState<HubState>("waypoint:hub", {
     capacity: "Steady",
     growthFocus: "",
     wellbeingGuardrail: "",
     learningMove: "",
     connectionMove: "",
   });
-  const [anchor, setAnchor] = useState<AnchorData>(initialAnchor);
-  const [trail, setTrail] = useState<TrailToday>({});
-  const [trailHistory, setTrailHistory] =
-    useState<TrailEntry[]>(sampleTrailHistory);
+  const [anchor, setAnchor] =
+    useLocalStorageState<AnchorData>("waypoint:anchor", initialAnchor);
+  const [trail, setTrail] = useLocalStorageState<TrailToday>(
+    "waypoint:trail",
+    {},
+  );
+  const [trailHistory, setTrailHistory] = useLocalStorageState<TrailEntry[]>(
+    "waypoint:trail-history",
+    sampleTrailHistory,
+  );
 
   function openWaypoint(view: WaypointView) {
     setSection("waypoint");
@@ -366,7 +567,16 @@ export default function Home() {
               setTrailHistory={setTrailHistory}
             />
           ) : (
-            <DowntimeSection />
+            <DowntimeSection
+              hub={hub}
+              setHub={setHub}
+              anchor={anchor}
+              setAnchor={setAnchor}
+              trail={trail}
+              setTrail={setTrail}
+              trailHistory={trailHistory}
+              setTrailHistory={setTrailHistory}
+            />
           )}
         </div>
       </div>
@@ -706,7 +916,68 @@ function HubPrompt({
   );
 }
 
-function DowntimeSection() {
+function DowntimeSection({
+  hub,
+  setHub,
+  anchor,
+  setAnchor,
+  trail,
+  setTrail,
+  trailHistory,
+  setTrailHistory,
+}: {
+  hub: HubState;
+  setHub: Dispatch<SetStateAction<HubState>>;
+  anchor: AnchorData;
+  setAnchor: Dispatch<SetStateAction<AnchorData>>;
+  trail: TrailToday;
+  setTrail: Dispatch<SetStateAction<TrailToday>>;
+  trailHistory: TrailEntry[];
+  setTrailHistory: Dispatch<SetStateAction<TrailEntry[]>>;
+}) {
+  const [statusLog, setStatusLog] = useLocalStorageState<
+    DowntimeStatusEntry[]
+  >("waypoint:downtime-status-log", []);
+  const [events, setEvents] = useLocalStorageState<DowntimeEvent[]>(
+    "waypoint:downtime-events",
+    [],
+  );
+  const [workflowSteps, setWorkflowSteps] = useLocalStorageState<
+    WorkflowStep[]
+  >("waypoint:downtime-workflow", defaultWorkflowSteps);
+  const [savedWorkflows, setSavedWorkflows] = useLocalStorageState<
+    SavedWorkflow[]
+  >("waypoint:saved-workflows", []);
+  const [reminders, setReminders] = useLocalStorageState<
+    Record<ReminderKey, ReminderSetting>
+  >("waypoint:reminders", defaultReminderSettings);
+  const [completedErgonomics, setCompletedErgonomics] = useLocalStorageState<
+    string[]
+  >("waypoint:ergonomics-checklist", []);
+  const [wellbeingRisk, setWellbeingRisk] =
+    useLocalStorageState<WellbeingRisk>(
+      "waypoint:wellbeing-risk",
+      defaultWellbeingRisk,
+    );
+  const [dayHistory, setDayHistory] = useLocalStorageState<DaySnapshot[]>(
+    "waypoint:day-history",
+    [],
+  );
+
+  function logEvent(type: DowntimeEventType, label: string) {
+    const now = new Date();
+    setEvents((current) => [
+      {
+        id: now.getTime(),
+        type,
+        time: formatTimeOfDay(now),
+        dateKey: formatDateKey(now),
+        label,
+      },
+      ...current,
+    ]);
+  }
+
   return (
     <section className="space-y-5">
       <SectionHeading
@@ -731,14 +1002,89 @@ function DowntimeSection() {
               symptoms, chest pain, marked distress, or functional deterioration
               warrant medical or occupational-health review.
             </p>
+            <Link
+              href="/downtime/builder"
+              className="mt-4 inline-flex items-center rounded-md bg-[#1a2e4a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#243f63]"
+            >
+              Open standalone workflow builder
+            </Link>
           </div>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_0.85fr]">
-        <DowntimeLoopPlanner />
+        <DowntimeLoopPlanner
+          workflowSteps={workflowSteps}
+          setWorkflowSteps={setWorkflowSteps}
+          savedWorkflows={savedWorkflows}
+          setSavedWorkflows={setSavedWorkflows}
+          statusLog={statusLog}
+          setStatusLog={setStatusLog}
+          logEvent={logEvent}
+        />
         <DowntimePlanCard />
       </div>
+
+      <div className="grid gap-4 lg:grid-cols-[0.85fr_1fr]">
+        <SmartReminderSystem
+          reminders={reminders}
+          setReminders={setReminders}
+          logEvent={logEvent}
+        />
+        <DailyRhythmDashboard events={events} statusLog={statusLog} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+        <TaskMicrolearningLibrary setAnchor={setAnchor} logEvent={logEvent} />
+        <InterruptFriendlyTaskBoard
+          setAnchor={setAnchor}
+          logEvent={logEvent}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[0.9fr_1fr]">
+        <ErgonomicsChecklist
+          completed={completedErgonomics}
+          setCompleted={setCompletedErgonomics}
+          logEvent={logEvent}
+        />
+        <LearningQuestlines setAnchor={setAnchor} logEvent={logEvent} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[0.9fr_1fr]">
+        <WellbeingCoach
+          anchor={anchor}
+          trail={trail}
+          hub={hub}
+          statusLog={statusLog}
+          events={events}
+          wellbeingRisk={wellbeingRisk}
+          setWellbeingRisk={setWellbeingRisk}
+        />
+        <ReportAndSharingPanel
+          anchor={anchor}
+          hub={hub}
+          trail={trail}
+          statusLog={statusLog}
+          events={events}
+          ergonomicsDone={completedErgonomics.length}
+        />
+      </div>
+
+      <LocalSaveHistory
+        hub={hub}
+        setHub={setHub}
+        anchor={anchor}
+        setAnchor={setAnchor}
+        trail={trail}
+        setTrail={setTrail}
+        trailHistory={trailHistory}
+        setTrailHistory={setTrailHistory}
+        statusLog={statusLog}
+        events={events}
+        dayHistory={dayHistory}
+        setDayHistory={setDayHistory}
+      />
 
       <AppliedProtocolCards />
 
@@ -770,21 +1116,124 @@ function DowntimeSection() {
         <PractitionerConclusionCard />
       </div>
 
-      <SourcesCard />
+      <EvidenceReferenceHub />
     </section>
   );
 }
 
-function DowntimeLoopPlanner() {
+function DowntimeLoopPlanner({
+  workflowSteps,
+  setWorkflowSteps,
+  savedWorkflows,
+  setSavedWorkflows,
+  statusLog,
+  setStatusLog,
+  logEvent,
+}: {
+  workflowSteps: WorkflowStep[];
+  setWorkflowSteps: Dispatch<SetStateAction<WorkflowStep[]>>;
+  savedWorkflows: SavedWorkflow[];
+  setSavedWorkflows: Dispatch<SetStateAction<SavedWorkflow[]>>;
+  statusLog: DowntimeStatusEntry[];
+  setStatusLog: Dispatch<SetStateAction<DowntimeStatusEntry[]>>;
+  logEvent: (type: DowntimeEventType, label: string) => void;
+}) {
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [statusText, setStatusText] = useState(
     "Queue checked; no assigned tickets; available for incoming support.",
   );
-  const [statusLog, setStatusLog] = useState<DowntimeStatusEntry[]>([]);
   const [copied, setCopied] = useState(false);
+  const [workflowName, setWorkflowName] = useState("Level 1 readiness loop");
+  const activeSteps = useMemo(
+    () => workflowSteps.filter((step) => step.enabled),
+    [workflowSteps],
+  );
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const currentStep = activeSteps[currentStepIndex] || activeSteps[0] || null;
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(
+    (currentStep?.duration || 1) * 60,
+  );
   const completion = Math.round(
     (completedSteps.length / downtimeLoopSteps.length) * 100,
   );
+
+  const finishCurrentStep = useCallback((fromTimer = false) => {
+    if (!currentStep) {
+      return;
+    }
+
+    setCompletedSteps((current) =>
+      current.includes(currentStep.id) ? current : [...current, currentStep.id],
+    );
+
+    const eventType =
+      currentStep.id === "visual"
+        ? "breakTaken"
+        : currentStep.id === "movement"
+          ? "movementCycle"
+          : currentStep.id === "status"
+            ? "statusLine"
+            : currentStep.id === "task"
+              ? "learningTask"
+              : "postureChange";
+
+    logEvent(
+      eventType,
+      `${currentStep.label}${fromTimer ? " timer completed" : " completed"}`,
+    );
+
+    const isLast = currentStepIndex >= activeSteps.length - 1;
+    if (isLast) {
+      logEvent("loopComplete", "Downtime workflow loop completed");
+      setTimerRunning(false);
+      setCurrentStepIndex(0);
+      setSecondsLeft((activeSteps[0]?.duration || 1) * 60);
+      return;
+    }
+
+    const nextIndex = currentStepIndex + 1;
+    setCurrentStepIndex(nextIndex);
+    setSecondsLeft((activeSteps[nextIndex]?.duration || 1) * 60);
+    setTimerRunning(false);
+  }, [activeSteps, currentStep, currentStepIndex, logEvent]);
+
+  useEffect(() => {
+    if (!currentStep) {
+      setTimerRunning(false);
+      setSecondsLeft(0);
+      return;
+    }
+
+    if (currentStepIndex >= activeSteps.length) {
+      setCurrentStepIndex(0);
+      return;
+    }
+
+    if (!timerRunning) {
+      setSecondsLeft(currentStep.duration * 60);
+    }
+  }, [activeSteps.length, currentStep, currentStepIndex, timerRunning]);
+
+  useEffect(() => {
+    if (!timerRunning || !currentStep) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setSecondsLeft((current) => {
+        if (current <= 1) {
+          window.clearInterval(interval);
+          finishCurrentStep(true);
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [timerRunning, currentStep, finishCurrentStep]);
 
   function toggleStep(stepId: string) {
     setCompletedSteps((current) =>
@@ -794,19 +1243,70 @@ function DowntimeLoopPlanner() {
     );
   }
 
+  function updateWorkflowStep(
+    stepId: string,
+    field: keyof WorkflowStep,
+    value: string | number | boolean,
+  ) {
+    setWorkflowSteps((current) =>
+      current.map((step) =>
+        step.id === stepId ? { ...step, [field]: value } : step,
+      ),
+    );
+  }
+
+  function moveWorkflowStep(stepId: string, direction: -1 | 1) {
+    setWorkflowSteps((current) => {
+      const index = current.findIndex((step) => step.id === stepId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) {
+        return current;
+      }
+
+      const next = [...current];
+      const [step] = next.splice(index, 1);
+      next.splice(nextIndex, 0, step);
+      return next;
+    });
+  }
+
+  function saveWorkflow() {
+    const name = workflowName.trim() || "Saved readiness loop";
+    const saved: SavedWorkflow = {
+      id: Date.now(),
+      name,
+      steps: workflowSteps,
+    };
+    setSavedWorkflows((current) => [saved, ...current.slice(0, 4)]);
+  }
+
+  function loadWorkflow(workflow: SavedWorkflow) {
+    setWorkflowSteps(workflow.steps);
+    setWorkflowName(workflow.name);
+    setCurrentStepIndex(0);
+    setTimerRunning(false);
+  }
+
+  function resetWorkflowTimer() {
+    setTimerRunning(false);
+    setCurrentStepIndex(0);
+    setSecondsLeft((activeSteps[0]?.duration || 1) * 60);
+  }
+
   function addStatusLine() {
     const text = statusText.trim();
     if (!text) {
       return;
     }
 
-    setStatusLog([
+    setStatusLog((current) => [
       { id: Date.now(), time: formatTimeOfDay(new Date()), text },
-      ...statusLog,
+      ...current,
     ]);
     setCompletedSteps((current) =>
       current.includes("status") ? current : [...current, "status"],
     );
+    logEvent("statusLine", text);
   }
 
   async function copyStatusLog() {
@@ -856,6 +1356,205 @@ function DowntimeLoopPlanner() {
         />
       </div>
 
+      <div className="mt-5 rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#2a7d8e]">
+              Workflow builder and timer
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[#607286]">
+              Customise the loop, then run it as an interrupt-friendly timer.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setTimerRunning((current) => !current)}
+              disabled={!currentStep}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1a2e4a] text-white transition hover:bg-[#243f63] disabled:cursor-not-allowed disabled:bg-[#9aa8b6]"
+              aria-label={timerRunning ? "Pause workflow timer" : "Start workflow timer"}
+              title={timerRunning ? "Pause" : "Start"}
+            >
+              {timerRunning ? (
+                <Pause className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <Play className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={resetWorkflowTimer}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#dbe3e0] text-[#607286] transition hover:bg-white"
+              aria-label="Reset workflow timer"
+              title="Reset timer"
+            >
+              <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-[#dbe3e0] bg-white p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a9aaa]">
+                Current step
+              </p>
+              <p className="mt-1 text-lg font-semibold">
+                {currentStep ? currentStep.label : "No enabled steps"}
+              </p>
+            </div>
+            <p className="font-mono text-3xl font-semibold text-[#2a7d8e]">
+              {formatTimer(secondsLeft)}
+            </p>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => finishCurrentStep(false)}
+              disabled={!currentStep}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-[#2a7d8e] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#246b79] disabled:cursor-not-allowed disabled:bg-[#9aa8b6]"
+            >
+              <Check className="h-4 w-4" aria-hidden="true" />
+              Complete step
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextIndex =
+                  activeSteps.length === 0
+                    ? 0
+                    : (currentStepIndex + 1) % activeSteps.length;
+                setCurrentStepIndex(nextIndex);
+                setTimerRunning(false);
+                setSecondsLeft((activeSteps[nextIndex]?.duration || 1) * 60);
+              }}
+              disabled={activeSteps.length < 2}
+              className="inline-flex items-center justify-center rounded-md border border-[#dbe3e0] px-3 py-2 text-sm font-semibold text-[#607286] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          {workflowSteps.map((step, index) => (
+            <div
+              key={step.id}
+              className="grid gap-3 rounded-lg border border-[#e4ebe8] bg-white p-3 md:grid-cols-[auto_1fr_5rem_auto]"
+            >
+              <input
+                type="checkbox"
+                checked={step.enabled}
+                onChange={(event) =>
+                  updateWorkflowStep(step.id, "enabled", event.target.checked)
+                }
+                aria-label={`Enable ${step.label}`}
+                className="mt-3 h-4 w-4 accent-[#2a7d8e]"
+              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input
+                  value={step.label}
+                  onChange={(event) =>
+                    updateWorkflowStep(step.id, "label", event.target.value)
+                  }
+                  className="rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-2 text-sm font-semibold outline-none focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+                />
+                <input
+                  value={step.description}
+                  onChange={(event) =>
+                    updateWorkflowStep(
+                      step.id,
+                      "description",
+                      event.target.value,
+                    )
+                  }
+                  className="rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-2 text-sm outline-none focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+                />
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={step.duration}
+                onChange={(event) =>
+                  updateWorkflowStep(
+                    step.id,
+                    "duration",
+                    clampNumber(event.target.value, 1, 60),
+                  )
+                }
+                className="rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-2 text-sm outline-none focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+                aria-label={`${step.label} duration in minutes`}
+              />
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => moveWorkflowStep(step.id, -1)}
+                  disabled={index === 0}
+                  className="h-9 rounded-md border border-[#dbe3e0] px-2 text-xs font-semibold text-[#607286] transition hover:bg-[#eef4f3] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Up
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveWorkflowStep(step.id, 1)}
+                  disabled={index === workflowSteps.length - 1}
+                  className="h-9 rounded-md border border-[#dbe3e0] px-2 text-xs font-semibold text-[#607286] transition hover:bg-[#eef4f3] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Down
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-2 md:grid-cols-[1fr_auto]">
+          <input
+            value={workflowName}
+            onChange={(event) => setWorkflowName(event.target.value)}
+            className="rounded-md border border-[#dbe3e0] bg-white px-3 py-2 text-sm outline-none focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+            aria-label="Workflow name"
+          />
+          <button
+            type="button"
+            onClick={saveWorkflow}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1a2e4a] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#243f63]"
+          >
+            <Save className="h-4 w-4" aria-hidden="true" />
+            Save loop
+          </button>
+        </div>
+
+        {savedWorkflows.length ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {savedWorkflows.map((workflow) => (
+              <button
+                key={workflow.id}
+                type="button"
+                onClick={() => loadWorkflow(workflow)}
+                className="rounded-md border border-[#dbe3e0] bg-white px-3 py-2 text-xs font-semibold text-[#607286] transition hover:border-[#9fcbd2]"
+              >
+                {workflow.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="mt-4 rounded-lg border border-[#e4ebe8] bg-white p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a9aaa]">
+            Briefing baseline
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {monitoringLoop.map((item) => (
+              <p key={item.time} className="text-xs leading-5 text-[#607286]">
+                <span className="font-mono font-semibold">{item.time}</span>{" "}
+                {item.action}
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {downtimeLoopSteps.map((step) => {
           const Icon = step.Icon;
@@ -901,6 +1600,18 @@ function DowntimeLoopPlanner() {
           >
             <RefreshCcw className="h-4 w-4" aria-hidden="true" />
           </button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {statusTemplates.map((template) => (
+            <button
+              key={template}
+              type="button"
+              onClick={() => setStatusText(template)}
+              className="rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-2 py-1 text-xs font-semibold text-[#607286] transition hover:border-[#9fcbd2]"
+            >
+              {template}
+            </button>
+          ))}
         </div>
         <div className="mt-3 flex gap-2">
           <input
@@ -961,6 +1672,886 @@ function DowntimeLoopPlanner() {
             ))
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SmartReminderSystem({
+  reminders,
+  setReminders,
+  logEvent,
+}: {
+  reminders: Record<ReminderKey, ReminderSetting>;
+  setReminders: Dispatch<SetStateAction<Record<ReminderKey, ReminderSetting>>>;
+  logEvent: (type: DowntimeEventType, label: string) => void;
+}) {
+  const [latestReminder, setLatestReminder] = useState<string | null>(null);
+
+  const triggerReminder = useCallback((key: ReminderKey) => {
+    const reminder = reminders[key];
+    const text = `${reminder.label}: ${reminder.message}`;
+    setLatestReminder(text);
+    logEvent("reminder", text);
+  }, [logEvent, reminders]);
+
+  useEffect(() => {
+    const intervals = (Object.keys(reminders) as ReminderKey[])
+      .filter((key) => reminders[key].enabled)
+      .map((key) =>
+        window.setInterval(
+          () => triggerReminder(key),
+          reminders[key].minutes * 60 * 1000,
+        ),
+      );
+
+    return () => intervals.forEach((interval) => window.clearInterval(interval));
+  }, [reminders, triggerReminder]);
+
+  function updateReminder(
+    key: ReminderKey,
+    field: keyof ReminderSetting,
+    value: boolean | number,
+  ) {
+    setReminders((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        [field]: value,
+      },
+    }));
+  }
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Timer className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Smart reminders</h3>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Configure in-app nudges for visual breaks, posture changes, status
+        notes, and walking intervals.
+      </p>
+
+      <div className="mt-5 grid gap-3">
+        {(Object.keys(reminders) as ReminderKey[]).map((key) => {
+          const reminder = reminders[key];
+          return (
+            <div
+              key={key}
+              className="grid gap-3 rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-3 sm:grid-cols-[1fr_6rem_auto]"
+            >
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={reminder.enabled}
+                  onChange={(event) =>
+                    updateReminder(key, "enabled", event.target.checked)
+                  }
+                  className="mt-1 h-4 w-4 accent-[#2a7d8e]"
+                />
+                <span>
+                  <span className="block text-sm font-semibold">
+                    {reminder.label}
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-[#607286]">
+                    {reminder.message}
+                  </span>
+                </span>
+              </label>
+              <label className="text-xs font-semibold text-[#607286]">
+                Minutes
+                <input
+                  type="number"
+                  min={1}
+                  max={180}
+                  value={reminder.minutes}
+                  onChange={(event) =>
+                    updateReminder(
+                      key,
+                      "minutes",
+                      clampNumber(event.target.value, 1, 180),
+                    )
+                  }
+                  className="mt-1 w-full rounded-md border border-[#dbe3e0] bg-white px-2 py-2 text-sm outline-none focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => triggerReminder(key)}
+                className="inline-flex items-center justify-center rounded-md border border-[#dbe3e0] px-3 py-2 text-xs font-semibold text-[#607286] transition hover:bg-white"
+              >
+                Trigger now
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {latestReminder ? (
+        <div className="mt-5 rounded-lg border border-[#a9d7de] bg-[#edf8fa] p-4 text-sm font-semibold leading-6 text-[#2a7d8e]">
+          {latestReminder}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DailyRhythmDashboard({
+  events,
+  statusLog,
+}: {
+  events: DowntimeEvent[];
+  statusLog: DowntimeStatusEntry[];
+}) {
+  const [range, setRange] = useState<"today" | "week">("today");
+  const todayKey = formatDateKey(new Date());
+  const visibleEvents =
+    range === "today"
+      ? events.filter((event) => event.dateKey === todayKey)
+      : events.filter((event) => daysBetween(event.dateKey, todayKey) < 7);
+  const metricRows = [
+    {
+      label: "Posture changes",
+      value: visibleEvents.filter((event) => event.type === "postureChange")
+        .length,
+    },
+    {
+      label: "Status lines",
+      value:
+        range === "today"
+          ? statusLog.length
+          : visibleEvents.filter((event) => event.type === "statusLine").length,
+    },
+    {
+      label: "Breaks used",
+      value: visibleEvents.filter((event) => event.type === "breakTaken").length,
+    },
+    {
+      label: "Movement blocks",
+      value: visibleEvents.filter((event) => event.type === "movementCycle")
+        .length,
+    },
+    {
+      label: "Loops completed",
+      value: visibleEvents.filter((event) => event.type === "loopComplete")
+        .length,
+    },
+    {
+      label: "Learning tasks",
+      value: visibleEvents.filter((event) => event.type === "learningTask")
+        .length,
+    },
+  ];
+  const maxValue = Math.max(...metricRows.map((row) => row.value), 1);
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-2">
+          <LayoutDashboard className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+          <h3 className="text-lg font-semibold">Daily rhythm dashboard</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-[#dbe3e0] bg-[#fbfcfb] p-1">
+          {(["today", "week"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setRange(option)}
+              className={`rounded-md px-3 py-2 text-xs font-semibold ${
+                range === option
+                  ? "bg-[#1a2e4a] text-white"
+                  : "text-[#607286] hover:bg-white"
+              }`}
+            >
+              {option === "today" ? "Today" : "7 days"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        A lightweight pattern view for posture, logging, breaks, movement, and
+        focus cycles.
+      </p>
+
+      <div className="mt-5 space-y-3">
+        {metricRows.map((row) => (
+          <div key={row.label}>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-semibold">{row.label}</span>
+              <span className="font-mono text-xs font-semibold text-[#8a9aaa]">
+                {row.value}
+              </span>
+            </div>
+            <div className="mt-1 h-2 rounded-full bg-[#eef4f3]">
+              <div
+                className="h-2 rounded-full bg-[#2a7d8e]"
+                style={{ width: `${Math.max((row.value / maxValue) * 100, row.value ? 8 : 0)}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TaskMicrolearningLibrary({
+  setAnchor,
+  logEvent,
+}: {
+  setAnchor: Dispatch<SetStateAction<AnchorData>>;
+  logEvent: (type: DowntimeEventType, label: string) => void;
+}) {
+  function addMicroTask(task: MicroTask) {
+    const text = `Microlearning: ${task.title} (${task.category})`;
+    setAnchor((current) => ({
+      ...current,
+      taskLog: [
+        { id: Date.now(), time: formatTimeOfDay(new Date()), text },
+        ...current.taskLog,
+      ],
+    }));
+    logEvent("learningTask", text);
+  }
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <BookOpen className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Task microlearning library</h3>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Short, low-switching-cost tasks for quiet support periods.
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {microTasks.map((task) => (
+          <div
+            key={task.id}
+            className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a9aaa]">
+              {task.category} · {task.minutes} min
+            </p>
+            <h4 className="mt-2 text-sm font-semibold">{task.title}</h4>
+            <p className="mt-2 text-xs leading-5 text-[#607286]">
+              {task.description}
+            </p>
+            <button
+              type="button"
+              onClick={() => addMicroTask(task)}
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-md bg-[#2a7d8e] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#246b79]"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              Add to task log
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InterruptFriendlyTaskBoard({
+  setAnchor,
+  logEvent,
+}: {
+  setAnchor: Dispatch<SetStateAction<AnchorData>>;
+  logEvent: (type: DowntimeEventType, label: string) => void;
+}) {
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const boardTasks = microTasks.slice(0, 5);
+
+  function logTask(task: MicroTask, status: "started" | "paused" | "done") {
+    const text = `Interrupt-friendly task ${status}: ${task.title}`;
+    if (status === "done") {
+      setAnchor((current) => ({
+        ...current,
+        taskLog: [
+          { id: Date.now(), time: formatTimeOfDay(new Date()), text },
+          ...current.taskLog,
+        ],
+      }));
+    }
+    logEvent(status === "done" ? "learningTask" : "taskLogEntry", text);
+  }
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <ClipboardList className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Interrupt-friendly task board</h3>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Tasks with obvious pause points, built for calls and tickets interrupting
+        at any moment.
+      </p>
+      <div className="mt-5 grid gap-3">
+        {boardTasks.map((task) => {
+          const active = activeTaskId === task.id;
+          return (
+            <div
+              key={task.id}
+              className={`rounded-lg border p-3 ${
+                active
+                  ? "border-[#2a7d8e] bg-[#edf8fa]"
+                  : "border-[#e4ebe8] bg-[#fbfcfb]"
+              }`}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold">{task.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-[#607286]">
+                    Pause point: finish the current sentence or checklist item.
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTaskId(task.id);
+                      logTask(task, "started");
+                    }}
+                    className="rounded-md border border-[#dbe3e0] bg-white px-2 py-1 text-xs font-semibold text-[#607286] hover:border-[#9fcbd2]"
+                  >
+                    Start
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTaskId(null);
+                      logTask(task, "paused");
+                    }}
+                    className="rounded-md border border-[#dbe3e0] bg-white px-2 py-1 text-xs font-semibold text-[#607286] hover:border-[#9fcbd2]"
+                  >
+                    Pause
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTaskId(null);
+                      logTask(task, "done");
+                    }}
+                    className="rounded-md bg-[#1a2e4a] px-2 py-1 text-xs font-semibold text-white hover:bg-[#243f63]"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ErgonomicsChecklist({
+  completed,
+  setCompleted,
+  logEvent,
+}: {
+  completed: string[];
+  setCompleted: Dispatch<SetStateAction<string[]>>;
+  logEvent: (type: DowntimeEventType, label: string) => void;
+}) {
+  const doneCount = completed.length;
+
+  function toggleItem(item: ErgonomicChecklistItem) {
+    setCompleted((current) => {
+      const isDone = current.includes(item.id);
+      if (!isDone) {
+        logEvent("ergonomics", `Ergonomics checked: ${item.label}`);
+      }
+      return isDone
+        ? current.filter((id) => id !== item.id)
+        : [...current, item.id];
+    });
+  }
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Monitor className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+          <h3 className="text-lg font-semibold">Ergonomics checklist</h3>
+        </div>
+        <span className="rounded-md bg-[#eef4f3] px-2 py-1 text-xs font-semibold text-[#607286]">
+          {doneCount}/{ergonomicChecklist.length}
+        </span>
+      </div>
+      <div className="mt-5 space-y-3">
+        {ergonomicChecklist.map((item) => {
+          const isDone = completed.includes(item.id);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => toggleItem(item)}
+              className={`w-full rounded-lg border p-3 text-left transition ${
+                isDone
+                  ? "border-[#2a7d8e] bg-[#edf8fa]"
+                  : "border-[#e4ebe8] bg-[#fbfcfb] hover:border-[#9fcbd2]"
+              }`}
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                {isDone ? (
+                  <Check className="h-4 w-4 text-[#2a7d8e]" aria-hidden="true" />
+                ) : null}
+                {item.label}
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-[#607286]">
+                {item.detail}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LearningQuestlines({
+  setAnchor,
+  logEvent,
+}: {
+  setAnchor: Dispatch<SetStateAction<AnchorData>>;
+  logEvent: (type: DowntimeEventType, label: string) => void;
+}) {
+  const [completed, setCompleted] = useLocalStorageState<string[]>(
+    "waypoint:questline-progress",
+    [],
+  );
+  const questlines = [
+    {
+      id: "m365",
+      title: "Microsoft 365 fundamentals",
+      tasks: ["Read one admin tip", "Write one support note", "Log one setting"],
+    },
+    {
+      id: "react",
+      title: "React component practice",
+      tasks: ["Build a tiny component", "Add one prop", "Summarise the pattern"],
+    },
+    {
+      id: "cyber",
+      title: "Cyber-safety reading",
+      tasks: ["Read one scenario", "Identify one risk", "Write one safe response"],
+    },
+  ];
+
+  function toggleQuestTask(questId: string, task: string) {
+    const id = `${questId}:${task}`;
+    setCompleted((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+    setAnchor((current) => ({
+      ...current,
+      taskLog: [
+        {
+          id: Date.now(),
+          time: formatTimeOfDay(new Date()),
+          text: `Questline progress: ${task}`,
+        },
+        ...current.taskLog,
+      ],
+    }));
+    logEvent("learningTask", `Questline progress: ${task}`);
+  }
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Route className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Learning questlines</h3>
+      </div>
+      <div className="mt-5 grid gap-3">
+        {questlines.map((quest) => {
+          const done = quest.tasks.filter((task) =>
+            completed.includes(`${quest.id}:${task}`),
+          ).length;
+          return (
+            <div
+              key={quest.id}
+              className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">{quest.title}</p>
+                <span className="font-mono text-xs font-semibold text-[#8a9aaa]">
+                  {done}/{quest.tasks.length}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {quest.tasks.map((task) => {
+                  const id = `${quest.id}:${task}`;
+                  return (
+                    <button
+                      key={task}
+                      type="button"
+                      onClick={() => toggleQuestTask(quest.id, task)}
+                      className={`rounded-md border px-3 py-2 text-left text-xs font-semibold transition ${
+                        completed.includes(id)
+                          ? "border-[#2a7d8e] bg-[#edf8fa] text-[#2a7d8e]"
+                          : "border-[#dbe3e0] bg-white text-[#607286] hover:border-[#9fcbd2]"
+                      }`}
+                    >
+                      {task}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WellbeingCoach({
+  anchor,
+  trail,
+  hub,
+  statusLog,
+  events,
+  wellbeingRisk,
+  setWellbeingRisk,
+}: {
+  anchor: AnchorData;
+  trail: TrailToday;
+  hub: HubState;
+  statusLog: DowntimeStatusEntry[];
+  events: DowntimeEvent[];
+  wellbeingRisk: WellbeingRisk;
+  setWellbeingRisk: Dispatch<SetStateAction<WellbeingRisk>>;
+}) {
+  const riskQuestions: { key: keyof WellbeingRisk; label: string }[] = [
+    { key: "sleep", label: "Sleep debt" },
+    { key: "hydration", label: "Hydration gap" },
+    { key: "eyes", label: "Eye strain" },
+    { key: "legs", label: "Leg fatigue" },
+    { key: "stress", label: "Stress load" },
+    { key: "clarity", label: "Expectation ambiguity" },
+  ];
+  const cues = getWellbeingCues(anchor, trail, hub, statusLog, events, wellbeingRisk);
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <HeartPulse className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Personalised wellbeing coach</h3>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Private, rules-based cues for static standing risk, low cognitive load,
+        visual fatigue, and recovery state.
+      </p>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {riskQuestions.map((question) => (
+          <label key={question.key} className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-3">
+            <span className="flex items-center justify-between gap-3 text-sm font-semibold">
+              {question.label}
+              <span className="font-mono text-xs text-[#8a9aaa]">
+                {wellbeingRisk[question.key]}/5
+              </span>
+            </span>
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={wellbeingRisk[question.key]}
+              onChange={(event) =>
+                setWellbeingRisk((current) => ({
+                  ...current,
+                  [question.key]: Number(event.target.value),
+                }))
+              }
+              className="mt-3 w-full accent-[#2a7d8e]"
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {cues.map((cue) => (
+          <div
+            key={cue.title}
+            className="rounded-lg border border-[#a9d7de] bg-[#edf8fa] p-4"
+          >
+            <p className="text-sm font-semibold text-[#2a7d8e]">{cue.title}</p>
+            <p className="mt-1 text-sm leading-6 text-[#607286]">{cue.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReportAndSharingPanel({
+  anchor,
+  hub,
+  trail,
+  statusLog,
+  events,
+  ergonomicsDone,
+}: {
+  anchor: AnchorData;
+  hub: HubState;
+  trail: TrailToday;
+  statusLog: DowntimeStatusEntry[];
+  events: DowntimeEvent[];
+  ergonomicsDone: number;
+}) {
+  const [managerReady, setManagerReady] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const report = managerReady
+    ? buildManagerReadyReport(anchor, hub, statusLog, events, ergonomicsDone)
+    : buildFullDayReport(anchor, hub, trail, statusLog, events, ergonomicsDone);
+
+  async function copyReport() {
+    await navigator.clipboard.writeText(report);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  function downloadReport() {
+    downloadTextFile(
+      report,
+      managerReady ? "waypoint-manager-summary.md" : "waypoint-day-summary.md",
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <NotebookPen className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+          <h3 className="text-lg font-semibold">Reports and sharing</h3>
+        </div>
+        <label className="flex items-center gap-2 text-xs font-semibold text-[#607286]">
+          <input
+            type="checkbox"
+            checked={managerReady}
+            onChange={(event) => setManagerReady(event.target.checked)}
+            className="h-4 w-4 accent-[#2a7d8e]"
+          />
+          Manager-ready
+        </label>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Generate a copyable or downloadable summary. Manager-ready mode excludes
+        personal reflection content.
+      </p>
+
+      <textarea
+        value={report}
+        readOnly
+        rows={10}
+        className="mt-5 w-full resize-none rounded-lg border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-3 font-mono text-xs leading-5 outline-none"
+      />
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={copyReport}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1a2e4a] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#243f63]"
+        >
+          <Copy className="h-4 w-4" aria-hidden="true" />
+          {copied ? "Copied" : "Copy report"}
+        </button>
+        <button
+          type="button"
+          onClick={downloadReport}
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-[#dbe3e0] px-3 py-2 text-sm font-semibold text-[#607286] transition hover:bg-[#eef4f3]"
+        >
+          <Save className="h-4 w-4" aria-hidden="true" />
+          Download text
+        </button>
+        <a
+          href={`mailto:?subject=${encodeURIComponent("Waypoint daily summary")}&body=${encodeURIComponent(report)}`}
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-[#dbe3e0] px-3 py-2 text-sm font-semibold text-[#607286] transition hover:bg-[#eef4f3]"
+        >
+          <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          Email draft
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function LocalSaveHistory({
+  hub,
+  setHub,
+  anchor,
+  setAnchor,
+  trail,
+  setTrail,
+  trailHistory,
+  setTrailHistory,
+  statusLog,
+  events,
+  dayHistory,
+  setDayHistory,
+}: {
+  hub: HubState;
+  setHub: Dispatch<SetStateAction<HubState>>;
+  anchor: AnchorData;
+  setAnchor: Dispatch<SetStateAction<AnchorData>>;
+  trail: TrailToday;
+  setTrail: Dispatch<SetStateAction<TrailToday>>;
+  trailHistory: TrailEntry[];
+  setTrailHistory: Dispatch<SetStateAction<TrailEntry[]>>;
+  statusLog: DowntimeStatusEntry[];
+  events: DowntimeEvent[];
+  dayHistory: DaySnapshot[];
+  setDayHistory: Dispatch<SetStateAction<DaySnapshot[]>>;
+}) {
+  function saveSnapshot() {
+    const now = new Date();
+    setDayHistory((current) => [
+      {
+        id: now.getTime(),
+        dateLabel: now.toLocaleDateString(undefined, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
+        anchor,
+        hub,
+        trail,
+        trailHistory,
+        statusLog,
+        events,
+      },
+      ...current.slice(0, 13),
+    ]);
+  }
+
+  function restoreSnapshot(snapshot: DaySnapshot) {
+    setHub(snapshot.hub);
+    setAnchor(snapshot.anchor);
+    setTrail(snapshot.trail);
+    setTrailHistory(snapshot.trailHistory || []);
+  }
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-2">
+          <Save className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+          <h3 className="text-lg font-semibold">Local save and history</h3>
+        </div>
+        <button
+          type="button"
+          onClick={saveSnapshot}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-[#2a7d8e] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#246b79]"
+        >
+          <Save className="h-4 w-4" aria-hidden="true" />
+          Save today
+        </button>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Core Waypoint state is stored locally in this browser. Save snapshots to
+        build a day-by-day history.
+      </p>
+      <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {dayHistory.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-[#dbe3e0] bg-[#fbfcfb] p-4 text-sm leading-6 text-[#607286] md:col-span-2 lg:col-span-3">
+            Saved days will appear here.
+          </p>
+        ) : (
+          dayHistory.map((snapshot) => (
+            <div
+              key={snapshot.id}
+              className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4"
+            >
+              <p className="text-sm font-semibold">{snapshot.dateLabel}</p>
+              <p className="mt-1 text-xs leading-5 text-[#607286]">
+                {snapshot.statusLog.length} status lines ·{" "}
+                {snapshot.anchor.taskLog.length} task entries
+              </p>
+              <button
+                type="button"
+                onClick={() => restoreSnapshot(snapshot)}
+                className="mt-3 rounded-md border border-[#dbe3e0] bg-white px-3 py-2 text-xs font-semibold text-[#607286] transition hover:border-[#9fcbd2]"
+              >
+                Restore
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EvidenceReferenceHub() {
+  const groups = [
+    { label: "Visual ergonomics", ids: ["aoa", "osha", "worksafe-qld"] },
+    {
+      label: "Standing and movement",
+      ids: ["standing-review", "safe-work-australia", "worksafe-qld"],
+    },
+    {
+      label: "Attention and underload",
+      ids: ["frontiers", "boredom-review"],
+    },
+    {
+      label: "Executive-function moderators",
+      ids: ["better-health", "healthdirect"],
+    },
+    { label: "Display-screen breaks", ids: ["hse"] },
+  ];
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2">
+        <ExternalLink className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+        <h3 className="text-lg font-semibold">Evidence and reference hub</h3>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Source library grouped by how a practitioner or builder would use the
+        evidence inside the app.
+      </p>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        {groups.map((group) => (
+          <div
+            key={group.label}
+            className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4"
+          >
+            <p className="text-sm font-semibold text-[#2a7d8e]">
+              {group.label}
+            </p>
+            <div className="mt-3 space-y-2">
+              {group.ids.map((id) => {
+                const source = sourceLinks.find((item) => item.id === id);
+                if (!source) {
+                  return null;
+                }
+
+                return (
+                  <a
+                    key={source.id}
+                    href={source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block rounded-md border border-[#dbe3e0] bg-white px-3 py-2 transition hover:border-[#9fcbd2]"
+                  >
+                    <span className="flex items-center gap-2 text-xs font-semibold text-[#607286]">
+                      {source.label}
+                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-[#607286]">
+                      {source.title}
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1339,36 +2930,6 @@ function PractitionerConclusionCard() {
           <p key={paragraph} className="text-sm leading-6 text-white/75">
             {paragraph}
           </p>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SourcesCard() {
-  return (
-    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2">
-        <ExternalLink className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
-        <h3 className="text-lg font-semibold">Sources</h3>
-      </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        {sourceLinks.map((source) => (
-          <a
-            key={source.id}
-            href={source.url}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4 transition hover:border-[#9fcbd2]"
-          >
-            <span className="flex items-center gap-2 text-sm font-semibold text-[#2a7d8e]">
-              {source.label}
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-            </span>
-            <span className="mt-1 block text-sm leading-6 text-[#607286]">
-              {source.title}
-            </span>
-          </a>
         ))}
       </div>
     </div>
@@ -2725,4 +4286,198 @@ function extractOneWord(examen: Examen) {
     .filter((word) => word.length > 3 && !stopWords.has(word));
 
   return words[0] || "noted";
+}
+
+function useLocalStorageState<T>(
+  key: string,
+  initialValue: T,
+): [T, Dispatch<SetStateAction<T>>] {
+  const [value, setValue] = useState<T>(() => {
+    if (typeof window === "undefined") {
+      return initialValue;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // Local persistence is a convenience, not a blocker for the app.
+    }
+  }, [key, value]);
+
+  return [value, setValue];
+}
+
+function clampNumber(value: string, min: number, max: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return min;
+  }
+
+  return Math.min(Math.max(Math.round(parsed), min), max);
+}
+
+function formatDateKey(date: Date) {
+  return `${date.getFullYear()}-${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`;
+}
+
+function daysBetween(dateKey: string, todayKey: string) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  const today = new Date(`${todayKey}T00:00:00`);
+  if (Number.isNaN(date.getTime()) || Number.isNaN(today.getTime())) {
+    return 999;
+  }
+
+  return Math.round((today.getTime() - date.getTime()) / 86_400_000);
+}
+
+function getWellbeingCues(
+  anchor: AnchorData,
+  trail: TrailToday,
+  hub: HubState,
+  statusLog: DowntimeStatusEntry[],
+  events: DowntimeEvent[],
+  risk: WellbeingRisk,
+) {
+  const cues: { title: string; text: string }[] = [];
+  const todayKey = formatDateKey(new Date());
+  const todaysEvents = events.filter((event) => event.dateKey === todayKey);
+
+  if (!anchor.locked) {
+    cues.push({
+      title: "Anchor first",
+      text: "Set one meaningful thing and one protected boundary before adding more controls.",
+    });
+  }
+
+  if (statusLog.length === 0) {
+    cues.push({
+      title: "Low-demand structure",
+      text: "Start with a queue check and a status line so readiness is visible.",
+    });
+  }
+
+  if (!todaysEvents.some((event) => event.type === "breakTaken") || risk.eyes >= 4) {
+    cues.push({
+      title: "Visual fatigue control",
+      text: "Use the 20-20-20 break and check monitor brightness, contrast, and glare.",
+    });
+  }
+
+  if (!todaysEvents.some((event) => event.type === "movementCycle") || risk.legs >= 4) {
+    cues.push({
+      title: "Static standing control",
+      text: "Add ankle pumps, calf raises, a short walk, or a posture change before the next loop.",
+    });
+  }
+
+  if (hub.capacity === "Full" || trail.pace === "pushing" || risk.stress >= 4) {
+    cues.push({
+      title: "Load protection",
+      text: "Choose the lowest-switching-cost task and keep the next action small enough to pause.",
+    });
+  }
+
+  if (risk.clarity >= 4) {
+    cues.push({
+      title: "Expectation clarity",
+      text: "Ask for or write down the response expectation: queue check rhythm, priority, and what counts as available.",
+    });
+  }
+
+  return cues.slice(0, 3);
+}
+
+function buildManagerReadyReport(
+  anchor: AnchorData,
+  hub: HubState,
+  statusLog: DowntimeStatusEntry[],
+  events: DowntimeEvent[],
+  ergonomicsDone: number,
+) {
+  const todayKey = formatDateKey(new Date());
+  const todaysEvents = events.filter((event) => event.dateKey === todayKey);
+  const taskLines = anchor.taskLog
+    .slice()
+    .reverse()
+    .map((entry) => `- ${entry.time}: ${entry.text}`)
+    .join("\n");
+  const statusLines = statusLog
+    .slice()
+    .reverse()
+    .map((entry) => `- ${entry.time}: ${entry.text}`)
+    .join("\n");
+
+  return [
+    "# Waypoint Manager-Ready Summary",
+    "",
+    `Date: ${new Date().toLocaleDateString()}`,
+    `Capacity: ${hub.capacity}`,
+    `Primary work focus: ${anchor.oneThing || "Not set"}`,
+    "",
+    "## Availability / Status Lines",
+    statusLines || "- No status lines logged.",
+    "",
+    "## Work Evidence",
+    taskLines || "- No task entries logged.",
+    "",
+    "## Downtime Controls Used",
+    `- Completed loops: ${todaysEvents.filter((event) => event.type === "loopComplete").length}`,
+    `- Movement blocks: ${todaysEvents.filter((event) => event.type === "movementCycle").length}`,
+    `- Visual breaks: ${todaysEvents.filter((event) => event.type === "breakTaken").length}`,
+    `- Ergonomics checks completed: ${ergonomicsDone}`,
+  ].join("\n");
+}
+
+function buildFullDayReport(
+  anchor: AnchorData,
+  hub: HubState,
+  trail: TrailToday,
+  statusLog: DowntimeStatusEntry[],
+  events: DowntimeEvent[],
+  ergonomicsDone: number,
+) {
+  const managerReport = buildManagerReadyReport(
+    anchor,
+    hub,
+    statusLog,
+    events,
+    ergonomicsDone,
+  );
+  const terrain = trail.terrain ? terrainMap[trail.terrain].label : "Not set";
+
+  return [
+    managerReport,
+    "",
+    "## Personal Reflection",
+    `- Nervous system: ${anchor.nervous || "Not set"}`,
+    `- Protected today: ${anchor.protect || "Not set"}`,
+    `- Trail terrain: ${terrain}`,
+    `- Pace: ${trail.pace || "Not set"}`,
+    `- End-of-day result: ${anchor.end?.didOneThing || "Not saved"}`,
+    `- Went well: ${anchor.end?.wentWell || "Not saved"}`,
+    `- Leave behind: ${anchor.end?.leaveBehind || "Not saved"}`,
+  ].join("\n");
+}
+
+function downloadTextFile(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
