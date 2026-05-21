@@ -32,6 +32,7 @@ import {
   Mountain,
   NotebookPen,
   Pause,
+  Pencil,
   PersonStanding,
   PhoneCall,
   Play,
@@ -43,6 +44,7 @@ import {
   Sprout,
   Sun,
   Timer,
+  Trash2,
 } from "lucide-react";
 import {
   appliedProtocols,
@@ -156,6 +158,38 @@ type WellbeingRisk = {
   clarity: number;
 };
 
+type ExternalAppLink = {
+  label: string;
+  url: string;
+};
+
+const relatedApps: ExternalAppLink[] = [
+  { label: "DCSPD App", url: "https://dcspd.vercel.app/" },
+  {
+    label: "DCS Professional Development",
+    url: "https://dcs-professional-development.vercel.app/",
+  },
+  {
+    label: "DCS Companion",
+    url: "https://joshuaparris-max.github.io/DCSCompanion",
+  },
+  { label: "DCS Prep App", url: "https://dcs-prep.vercel.app/" },
+  { label: "Josh Hub", url: "https://josh-hub-two.vercel.app/dashboard" },
+  {
+    label: "JoshDashboard v1",
+    url: "https://joshdashboard2-3d63fzekflg2wlakjmrakz.streamlit.app/",
+  },
+  {
+    label: "JoshDashboard v2",
+    url: "https://josh-dashboard-black.vercel.app/app/dashboard.html",
+  },
+  {
+    label: "Avance PD",
+    url: "https://avance-professional-development.vercel.app/",
+  },
+  { label: "Avance PD (alt)", url: "https://avance-pd.vercel.app/" },
+];
+
 type DaySnapshot = {
   id: number;
   dateLabel: string;
@@ -165,6 +199,11 @@ type DaySnapshot = {
   trailHistory: TrailEntry[];
   statusLog: DowntimeStatusEntry[];
   events: DowntimeEvent[];
+  workflowSteps?: WorkflowStep[];
+  savedWorkflows?: SavedWorkflow[];
+  reminders?: Record<ReminderKey, ReminderSetting>;
+  completedErgonomics?: string[];
+  wellbeingRisk?: WellbeingRisk;
 };
 
 type EndOfDay = {
@@ -856,6 +895,39 @@ function HubSection({
         </div>
       </div>
 
+      <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="rounded-md bg-[#edf8fa] p-2 text-[#2a7d8e]">
+            <ExternalLink className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#2a7d8e]">
+              Connected apps
+            </p>
+            <h2 className="mt-1 text-xl font-semibold">
+              Explore related professional development tools
+            </h2>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {relatedApps.map((app) => (
+            <a
+              key={app.url}
+              href={app.url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg border border-[#dbe3e0] bg-[#f8fbfa] p-4 text-sm text-[#1a2e4a] transition hover:border-[#9fcbd2] hover:bg-[#eef7f4]"
+            >
+              <p className="font-semibold">{app.label}</p>
+              <p className="mt-2 text-xs text-[#607286] break-words">
+                {app.url}
+              </p>
+            </a>
+          ))}
+        </div>
+      </div>
+
       <NextMoveCard move={nextMove} />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -865,6 +937,7 @@ function HubSection({
           title="Growth focus"
           value={hub.growthFocus}
           placeholder="A skill, decision, or craft edge to work on"
+          helper="Example: practise concise ticket notes, review one M365 admin concept, or rehearse a support handoff."
           onChange={(value) => updateHub("growthFocus", value)}
         />
         <HubPrompt
@@ -873,6 +946,7 @@ function HubSection({
           title="Wellbeing guardrail"
           value={hub.wellbeingGuardrail}
           placeholder="A boundary, recovery move, or constraint to honour"
+          helper="Example: take lunch away from the screen, switch posture every 30 minutes, or keep one buffer block."
           onChange={(value) => updateHub("wellbeingGuardrail", value)}
         />
         <HubPrompt
@@ -881,6 +955,7 @@ function HubSection({
           title="Learning move"
           value={hub.learningMove}
           placeholder="One article, practice rep, course note, or question"
+          helper="Example: read one vendor article and write one practical takeaway."
           onChange={(value) => updateHub("learningMove", value)}
         />
         <HubPrompt
@@ -889,6 +964,7 @@ function HubSection({
           title="Connection move"
           value={hub.connectionMove}
           placeholder="One person, conversation, or repair worth making"
+          helper="Example: ask one clarifying question, close a loop, or send a short update."
           onChange={(value) => updateHub("connectionMove", value)}
         />
       </div>
@@ -1004,6 +1080,7 @@ function HubPrompt({
   title,
   value,
   placeholder,
+  helper,
   onChange,
 }: {
   id?: string;
@@ -1011,6 +1088,7 @@ function HubPrompt({
   title: string;
   value: string;
   placeholder: string;
+  helper: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -1027,6 +1105,9 @@ function HubPrompt({
         rows={3}
         className="mt-3 w-full resize-none rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-3 text-sm leading-6 outline-none transition placeholder:text-[#8a9aaa] focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
       />
+      <span className="mt-2 block text-xs leading-5 text-[#607286]">
+        {helper}
+      </span>
     </label>
   );
 }
@@ -1196,42 +1277,66 @@ function DowntimeSection({
         trailHistory={trailHistory}
         setTrailHistory={setTrailHistory}
         statusLog={statusLog}
+        setStatusLog={setStatusLog}
         events={events}
+        setEvents={setEvents}
+        workflowSteps={workflowSteps}
+        setWorkflowSteps={setWorkflowSteps}
+        savedWorkflows={savedWorkflows}
+        setSavedWorkflows={setSavedWorkflows}
+        reminders={reminders}
+        setReminders={setReminders}
+        completedErgonomics={completedErgonomics}
+        setCompletedErgonomics={setCompletedErgonomics}
+        wellbeingRisk={wellbeingRisk}
+        setWellbeingRisk={setWellbeingRisk}
         dayHistory={dayHistory}
         setDayHistory={setDayHistory}
       />
 
-      <AppliedProtocolCards />
+      <details className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+        <summary className="cursor-pointer text-lg font-semibold text-[#1a2e4a]">
+          Briefing details and evidence library
+        </summary>
+        <p className="mt-2 text-sm leading-6 text-[#607286]">
+          The daily controls above stay visible first. Expand this section when
+          you need the full practitioner rationale, evidence strength, and
+          source library.
+        </p>
+        <div className="mt-5 space-y-5">
+          <AppliedProtocolCards />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ControlsPanel
-          icon={Monitor}
-          title="Guideline-supported controls"
-          controls={guidelineControls}
-        />
-        <ControlsPanel
-          icon={PersonStanding}
-          title="Evidence-aligned physical controls"
-          controls={physicalControls}
-        />
-      </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ControlsPanel
+              icon={Monitor}
+              title="Guideline-supported controls"
+              controls={guidelineControls}
+            />
+            <ControlsPanel
+              icon={PersonStanding}
+              title="Evidence-aligned physical controls"
+              controls={physicalControls}
+            />
+          </div>
 
-      <div className="grid gap-4 lg:grid-cols-[0.8fr_1fr]">
-        <BriefingScopeCard />
-        <OperationalDefinitionCard />
-      </div>
+          <div className="grid gap-4 lg:grid-cols-[0.8fr_1fr]">
+            <BriefingScopeCard />
+            <OperationalDefinitionCard />
+          </div>
 
-      <EvidenceClassificationCard />
-      <MechanismGrid />
-      <ModeratorTable />
-      <EvidenceSummaryTable />
+          <EvidenceClassificationCard />
+          <MechanismGrid />
+          <ModeratorTable />
+          <EvidenceSummaryTable />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
-        <LimitationsCard />
-        <PractitionerConclusionCard />
-      </div>
+          <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+            <LimitationsCard />
+            <PractitionerConclusionCard />
+          </div>
 
-      <EvidenceReferenceHub />
+          <EvidenceReferenceHub />
+        </div>
+      </details>
     </section>
   );
 }
@@ -1257,6 +1362,8 @@ function DowntimeLoopPlanner({
   const [statusText, setStatusText] = useState(
     "Queue checked; no assigned tickets; available for incoming support.",
   );
+  const [editingStatusId, setEditingStatusId] = useState<number | null>(null);
+  const [editingStatusText, setEditingStatusText] = useState("");
   const [copied, setCopied] = useState(false);
   const [workflowName, setWorkflowName] = useState("Level 1 readiness loop");
   const activeSteps = useMemo(
@@ -1422,6 +1529,34 @@ function DowntimeLoopPlanner({
       current.includes("status") ? current : [...current, "status"],
     );
     logEvent("statusLine", text);
+  }
+
+  function startEditingStatus(item: DowntimeStatusEntry) {
+    setEditingStatusId(item.id);
+    setEditingStatusText(item.text);
+  }
+
+  function saveEditedStatus() {
+    const text = editingStatusText.trim();
+    if (!editingStatusId || !text) {
+      return;
+    }
+
+    setStatusLog((current) =>
+      current.map((item) =>
+        item.id === editingStatusId ? { ...item, text } : item,
+      ),
+    );
+    setEditingStatusId(null);
+    setEditingStatusText("");
+  }
+
+  function deleteStatusLine(id: number) {
+    setStatusLog((current) => current.filter((item) => item.id !== id));
+    if (editingStatusId === id) {
+      setEditingStatusId(null);
+      setEditingStatusText("");
+    }
   }
 
   async function copyStatusLog() {
@@ -1777,12 +1912,61 @@ function DowntimeLoopPlanner({
             statusLog.map((item) => (
               <div
                 key={item.id}
-                className="grid grid-cols-[4.75rem_1fr] gap-3 border-t border-[#e4ebe8] pt-2 text-sm first:border-t-0 first:pt-0"
+                className="grid gap-3 border-t border-[#e4ebe8] pt-2 text-sm first:border-t-0 first:pt-0 sm:grid-cols-[4.75rem_1fr_auto]"
               >
                 <span className="font-mono text-xs font-semibold text-[#8a9aaa]">
                   {item.time}
                 </span>
-                <span className="leading-5">{item.text}</span>
+                {editingStatusId === item.id ? (
+                  <input
+                    value={editingStatusText}
+                    onChange={(event) => setEditingStatusText(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        saveEditedStatus();
+                      }
+                      if (event.key === "Escape") {
+                        setEditingStatusId(null);
+                        setEditingStatusText("");
+                      }
+                    }}
+                    className="min-w-0 rounded-md border border-[#dbe3e0] bg-white px-3 py-2 text-sm outline-none focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+                  />
+                ) : (
+                  <span className="leading-5">{item.text}</span>
+                )}
+                <div className="flex gap-1">
+                  {editingStatusId === item.id ? (
+                    <button
+                      type="button"
+                      onClick={saveEditedStatus}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#dbe3e0] bg-white text-[#2a7d8e] transition hover:bg-[#eef4f3]"
+                      aria-label="Save status line"
+                      title="Save"
+                    >
+                      <Save className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEditingStatus(item)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#dbe3e0] bg-white text-[#607286] transition hover:bg-[#eef4f3]"
+                      aria-label="Edit status line"
+                      title="Edit"
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => deleteStatusLine(item.id)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#f0d2cb] bg-white text-[#9d5338] transition hover:bg-[#fff7f2]"
+                    aria-label="Delete status line"
+                    title="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
             ))
           )}
@@ -2506,7 +2690,19 @@ function LocalSaveHistory({
   trailHistory,
   setTrailHistory,
   statusLog,
+  setStatusLog,
   events,
+  setEvents,
+  workflowSteps,
+  setWorkflowSteps,
+  savedWorkflows,
+  setSavedWorkflows,
+  reminders,
+  setReminders,
+  completedErgonomics,
+  setCompletedErgonomics,
+  wellbeingRisk,
+  setWellbeingRisk,
   dayHistory,
   setDayHistory,
 }: {
@@ -2519,7 +2715,19 @@ function LocalSaveHistory({
   trailHistory: TrailEntry[];
   setTrailHistory: Dispatch<SetStateAction<TrailEntry[]>>;
   statusLog: DowntimeStatusEntry[];
+  setStatusLog: Dispatch<SetStateAction<DowntimeStatusEntry[]>>;
   events: DowntimeEvent[];
+  setEvents: Dispatch<SetStateAction<DowntimeEvent[]>>;
+  workflowSteps: WorkflowStep[];
+  setWorkflowSteps: Dispatch<SetStateAction<WorkflowStep[]>>;
+  savedWorkflows: SavedWorkflow[];
+  setSavedWorkflows: Dispatch<SetStateAction<SavedWorkflow[]>>;
+  reminders: Record<ReminderKey, ReminderSetting>;
+  setReminders: Dispatch<SetStateAction<Record<ReminderKey, ReminderSetting>>>;
+  completedErgonomics: string[];
+  setCompletedErgonomics: Dispatch<SetStateAction<string[]>>;
+  wellbeingRisk: WellbeingRisk;
+  setWellbeingRisk: Dispatch<SetStateAction<WellbeingRisk>>;
   dayHistory: DaySnapshot[];
   setDayHistory: Dispatch<SetStateAction<DaySnapshot[]>>;
 }) {
@@ -2539,6 +2747,11 @@ function LocalSaveHistory({
         trailHistory,
         statusLog,
         events,
+        workflowSteps,
+        savedWorkflows,
+        reminders,
+        completedErgonomics,
+        wellbeingRisk,
       },
       ...current.slice(0, 13),
     ]);
@@ -2549,6 +2762,13 @@ function LocalSaveHistory({
     setAnchor(snapshot.anchor);
     setTrail(snapshot.trail);
     setTrailHistory(snapshot.trailHistory || []);
+    setStatusLog(snapshot.statusLog || []);
+    setEvents(snapshot.events || []);
+    setWorkflowSteps(snapshot.workflowSteps || defaultWorkflowSteps);
+    setSavedWorkflows(snapshot.savedWorkflows || []);
+    setReminders(snapshot.reminders || defaultReminderSettings);
+    setCompletedErgonomics(snapshot.completedErgonomics || []);
+    setWellbeingRisk(snapshot.wellbeingRisk || defaultWellbeingRisk);
   }
 
   return (
@@ -3296,6 +3516,7 @@ function AnchorModule({
   setAnchor: (anchor: AnchorData) => void;
 }) {
   const [step, setStep] = useState<AnchorStep>("checkin");
+  const [editingAnchor, setEditingAnchor] = useState(false);
   const [draft, setDraft] = useState({
     nervous: "",
     oneThing: "",
@@ -3322,6 +3543,27 @@ function AnchorModule({
     );
   }
 
+  if (editingAnchor) {
+    return (
+      <section className="space-y-5">
+        <SectionHeading
+          icon={Anchor}
+          label="Anchor"
+          title="Revise the anchor"
+          text="Adjust the day without losing the task evidence already logged."
+        />
+        <AnchorEditCard
+          anchor={anchor}
+          onCancel={() => setEditingAnchor(false)}
+          onSave={(next) => {
+            setAnchor(next);
+            setEditingAnchor(false);
+          }}
+        />
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-5">
       <SectionHeading
@@ -3331,7 +3573,20 @@ function AnchorModule({
         text="Structure for the work, room for the nervous system."
       />
 
-      <AnchorSummaryCard anchor={anchor} />
+      <AnchorSummaryCard
+        anchor={anchor}
+        onEdit={() => setEditingAnchor(true)}
+        onReset={() =>
+          setAnchor({
+            ...anchor,
+            locked: false,
+            nervous: "",
+            oneThing: "",
+            protect: "",
+            end: undefined,
+          })
+        }
+      />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
         <FocusTimer oneThing={anchor.oneThing} />
@@ -3340,6 +3595,105 @@ function AnchorModule({
 
       <EndOfDay anchor={anchor} setAnchor={setAnchor} />
     </section>
+  );
+}
+
+function AnchorEditCard({
+  anchor,
+  onCancel,
+  onSave,
+}: {
+  anchor: AnchorData;
+  onCancel: () => void;
+  onSave: (anchor: AnchorData) => void;
+}) {
+  const [draft, setDraft] = useState({
+    nervous: anchor.nervous || "",
+    oneThing: anchor.oneThing,
+    protect: anchor.protect,
+  });
+
+  const canSave = draft.oneThing.trim() && draft.protect.trim();
+
+  return (
+    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+      <div className="grid gap-5">
+        <div>
+          <p className="text-sm font-semibold">Nervous-system state</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-5">
+            {nervousOptions.map((option) => {
+              const isSelected = draft.nervous === option.label;
+
+              return (
+                <button
+                  key={option.label}
+                  type="button"
+                  onClick={() => setDraft({ ...draft, nervous: option.label })}
+                  aria-pressed={isSelected}
+                  className="rounded-lg border px-3 py-3 text-center text-sm font-semibold transition hover:-translate-y-0.5"
+                  style={{
+                    backgroundColor: option.tint,
+                    borderColor: isSelected ? "#2a7d8e" : option.border,
+                    color: option.color,
+                  }}
+                >
+                  {option.label}
+                  {isSelected ? (
+                    <span className="mt-1 block text-[0.65rem] uppercase tracking-[0.14em]">
+                      Selected
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <label className="block">
+          <span className="text-sm font-semibold">One thing</span>
+          <input
+            value={draft.oneThing}
+            onChange={(event) =>
+              setDraft({ ...draft, oneThing: event.target.value })
+            }
+            className="mt-2 w-full rounded-md border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-3 text-sm outline-none focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+          />
+        </label>
+
+        <ReflectionTextarea
+          label="Protected today"
+          value={draft.protect}
+          onChange={(value) => setDraft({ ...draft, protect: value })}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={!canSave}
+            onClick={() =>
+              onSave({
+                ...anchor,
+                locked: true,
+                nervous: draft.nervous,
+                oneThing: draft.oneThing.trim(),
+                protect: draft.protect.trim(),
+              })
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1a2e4a] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#243f63] disabled:cursor-not-allowed disabled:bg-[#9aa8b6]"
+          >
+            <Save className="h-4 w-4" aria-hidden="true" />
+            Save anchor
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md border border-[#dbe3e0] px-4 py-3 text-sm font-semibold text-[#607286] transition hover:bg-[#eef4f3]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -3460,7 +3814,15 @@ function AnchorSequence({
   );
 }
 
-function AnchorSummaryCard({ anchor }: { anchor: AnchorData }) {
+function AnchorSummaryCard({
+  anchor,
+  onEdit,
+  onReset,
+}: {
+  anchor: AnchorData;
+  onEdit: () => void;
+  onReset: () => void;
+}) {
   const nervous = anchor.nervous
     ? nervousOptions.find((option) => option.label === anchor.nervous)
     : null;
@@ -3474,18 +3836,36 @@ function AnchorSummaryCard({ anchor }: { anchor: AnchorData }) {
             {anchor.oneThing}
           </h3>
         </div>
-        {nervous ? (
-          <span
-            className="inline-flex self-start rounded-md border px-3 py-2 text-sm font-semibold"
-            style={{
-              backgroundColor: nervous.tint,
-              borderColor: nervous.border,
-              color: nervous.color,
-            }}
+        <div className="flex flex-wrap items-start gap-2">
+          {nervous ? (
+            <span
+              className="inline-flex self-start rounded-md border px-3 py-2 text-sm font-semibold"
+              style={{
+                backgroundColor: nervous.tint,
+                borderColor: nervous.border,
+                color: nervous.color,
+              }}
+            >
+              {nervous.label}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-2 rounded-md border border-[#dbe3e0] px-3 py-2 text-sm font-semibold text-[#607286] transition hover:bg-[#eef4f3]"
           >
-            {nervous.label}
-          </span>
-        ) : null}
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="inline-flex items-center gap-2 rounded-md border border-[#f0d2cb] px-3 py-2 text-sm font-semibold text-[#9d5338] transition hover:bg-[#fff7f2]"
+          >
+            <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+            Reset
+          </button>
+        </div>
       </div>
       <div className="mt-5 border-t border-[#e4ebe8] pt-4">
         <p className="text-sm font-semibold text-[#607286]">Protected today</p>
@@ -3569,6 +3949,10 @@ function FocusTimer({ oneThing }: { oneThing: string }) {
           {timer.mode === "work" ? "25/5" : "Break"}
         </span>
       </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Start the timer to run a focus block for the anchor. It pauses at each
+        work/break boundary so you can choose the next move deliberately.
+      </p>
 
       <div className="mt-5 flex min-h-[270px] items-center justify-center rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-5 text-center">
         {timer.mode === "work" ? (
@@ -3596,7 +3980,7 @@ function FocusTimer({ oneThing }: { oneThing: string }) {
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
         <button
           type="button"
           onClick={() =>
@@ -3604,22 +3988,24 @@ function FocusTimer({ oneThing }: { oneThing: string }) {
           }
           aria-label={timer.running ? "Pause timer" : "Start timer"}
           title={timer.running ? "Pause" : "Start"}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#1a2e4a] text-white transition hover:bg-[#243f63]"
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1a2e4a] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#243f63]"
         >
           {timer.running ? (
             <Pause className="h-5 w-5" aria-hidden="true" />
           ) : (
             <Play className="h-5 w-5" aria-hidden="true" />
           )}
+          {timer.running ? "Pause" : "Start focus"}
         </button>
         <button
           type="button"
           onClick={resetTimer}
           aria-label="Reset timer"
           title="Reset"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-[#dbe3e0] bg-white text-[#607286] transition hover:bg-[#eef4f3]"
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-[#dbe3e0] bg-white px-4 py-3 text-sm font-semibold text-[#607286] transition hover:bg-[#eef4f3]"
         >
           <RefreshCcw className="h-5 w-5" aria-hidden="true" />
+          Reset
         </button>
       </div>
 
@@ -3661,6 +4047,8 @@ function TaskLog({
   setAnchor: (anchor: AnchorData) => void;
 }) {
   const [entry, setEntry] = useState("");
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editingTaskText, setEditingTaskText] = useState("");
   const [copied, setCopied] = useState(false);
 
   function addEntry() {
@@ -3677,6 +4065,38 @@ function TaskLog({
       ],
     });
     setEntry("");
+  }
+
+  function startEditingTask(item: TaskEntry) {
+    setEditingTaskId(item.id);
+    setEditingTaskText(item.text);
+  }
+
+  function saveEditedTask() {
+    const text = editingTaskText.trim();
+    if (!editingTaskId || !text) {
+      return;
+    }
+
+    setAnchor({
+      ...anchor,
+      taskLog: anchor.taskLog.map((item) =>
+        item.id === editingTaskId ? { ...item, text } : item,
+      ),
+    });
+    setEditingTaskId(null);
+    setEditingTaskText("");
+  }
+
+  function deleteTask(id: number) {
+    setAnchor({
+      ...anchor,
+      taskLog: anchor.taskLog.filter((item) => item.id !== id),
+    });
+    if (editingTaskId === id) {
+      setEditingTaskId(null);
+      setEditingTaskText("");
+    }
   }
 
   async function copyLog() {
@@ -3749,12 +4169,61 @@ function TaskLog({
           anchor.taskLog.map((item) => (
             <div
               key={item.id}
-              className="grid grid-cols-[4.75rem_1fr] gap-3 rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-3 text-sm"
+              className="grid gap-3 rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-3 text-sm sm:grid-cols-[4.75rem_1fr_auto]"
             >
               <span className="font-mono text-xs font-semibold text-[#8a9aaa]">
                 {item.time}
               </span>
-              <span className="leading-5">{item.text}</span>
+              {editingTaskId === item.id ? (
+                <input
+                  value={editingTaskText}
+                  onChange={(event) => setEditingTaskText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      saveEditedTask();
+                    }
+                    if (event.key === "Escape") {
+                      setEditingTaskId(null);
+                      setEditingTaskText("");
+                    }
+                  }}
+                  className="min-w-0 rounded-md border border-[#dbe3e0] bg-white px-3 py-2 text-sm outline-none focus:border-[#2a7d8e] focus:ring-2 focus:ring-[#2a7d8e]/15"
+                />
+              ) : (
+                <span className="leading-5">{item.text}</span>
+              )}
+              <div className="flex gap-1">
+                {editingTaskId === item.id ? (
+                  <button
+                    type="button"
+                    onClick={saveEditedTask}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#dbe3e0] bg-white text-[#2a7d8e] transition hover:bg-[#eef4f3]"
+                    aria-label="Save task log entry"
+                    title="Save"
+                  >
+                    <Save className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => startEditingTask(item)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#dbe3e0] bg-white text-[#607286] transition hover:bg-[#eef4f3]"
+                    aria-label="Edit task log entry"
+                    title="Edit"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => deleteTask(item.id)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#f0d2cb] bg-white text-[#9d5338] transition hover:bg-[#fff7f2]"
+                  aria-label="Delete task log entry"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -3777,7 +4246,7 @@ function EndOfDay({
   });
 
   if (anchor.end) {
-    return <FullDayCard anchor={anchor} />;
+    return <FullDayCard anchor={anchor} setAnchor={setAnchor} />;
   }
 
   return (
@@ -3836,16 +4305,122 @@ function EndOfDay({
   );
 }
 
-function FullDayCard({ anchor }: { anchor: AnchorData }) {
+function FullDayCard({
+  anchor,
+  setAnchor,
+}: {
+  anchor: AnchorData;
+  setAnchor: (anchor: AnchorData) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<EndOfDay>(
+    anchor.end || {
+      didOneThing: "Partly",
+      wentWell: "",
+      leaveBehind: "",
+    },
+  );
   const nervous = anchor.nervous
     ? nervousOptions.find((option) => option.label === anchor.nervous)
     : null;
 
+  if (editing) {
+    return (
+      <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <NotebookPen className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+          <h3 className="text-lg font-semibold">Revise day card</h3>
+        </div>
+        <div className="mt-5 space-y-5">
+          <div>
+            <p className="text-sm font-semibold">Did you do the one thing?</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {(["Yes", "Partly", "No"] as DidOneThing[]).map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  onClick={() => setDraft({ ...draft, didOneThing: choice })}
+                  aria-pressed={draft.didOneThing === choice}
+                  className={`rounded-lg border p-3 text-left transition ${
+                    draft.didOneThing === choice
+                      ? "border-[#2a7d8e] bg-[#edf8fa]"
+                      : "border-[#dbe3e0] bg-[#fbfcfb] hover:border-[#9fcbd2]"
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-2 text-sm font-semibold">
+                    {choice}
+                    {draft.didOneThing === choice ? (
+                      <Check className="h-4 w-4 text-[#2a7d8e]" aria-hidden="true" />
+                    ) : null}
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-[#607286]">
+                    {didOneThingCopy[choice]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <ReflectionTextarea
+            label={"What's one thing that went well?"}
+            value={draft.wentWell}
+            onChange={(value) => setDraft({ ...draft, wentWell: value })}
+          />
+          <ReflectionTextarea
+            label="What do you want to leave here?"
+            value={draft.leaveBehind}
+            onChange={(value) => setDraft({ ...draft, leaveBehind: value })}
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={!draft.wentWell.trim() || !draft.leaveBehind.trim()}
+              onClick={() => {
+                setAnchor({ ...anchor, end: draft });
+                setEditing(false);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1a2e4a] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#243f63] disabled:cursor-not-allowed disabled:bg-[#9aa8b6]"
+            >
+              <Save className="h-4 w-4" aria-hidden="true" />
+              Save day card
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="rounded-md border border-[#dbe3e0] px-4 py-3 text-sm font-semibold text-[#607286] transition hover:bg-[#eef4f3]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2">
-        <NotebookPen className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
-        <h3 className="text-lg font-semibold">Full day card</h3>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <NotebookPen className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
+          <h3 className="text-lg font-semibold">Full day card</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-[#dbe3e0] px-3 py-2 text-sm font-semibold text-[#607286] transition hover:bg-[#eef4f3]"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setAnchor({ ...anchor, end: undefined })}
+            className="inline-flex items-center gap-2 rounded-md border border-[#f0d2cb] px-3 py-2 text-sm font-semibold text-[#9d5338] transition hover:bg-[#fff7f2]"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            Clear
+          </button>
+        </div>
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <DayCardItem label="Nervous system" value={anchor.nervous || "Not set"}>
@@ -3918,6 +4493,14 @@ function TrailModule({
   });
   const [selectedTrailId, setSelectedTrailId] = useState<string | null>(null);
 
+  useEffect(() => {
+    setExamenDraft({
+      alive: trail.examen?.alive || "",
+      drained: trail.examen?.drained || "",
+      carry: trail.examen?.carry || "",
+    });
+  }, [trail.examen]);
+
   const todayEntry = useMemo<TrailEntry | null>(() => {
     if (!trail.examen || !trail.terrain) {
       return null;
@@ -3960,6 +4543,26 @@ function TrailModule({
     setSelectedTrailId("today");
   }
 
+  function clearTodayExamen() {
+    setTrail({ ...trail, examen: undefined });
+    setExamenDraft({ alive: "", drained: "", carry: "" });
+    if (selectedTrailId === "today") {
+      setSelectedTrailId(null);
+    }
+  }
+
+  function deleteTrailEntry(entry: TrailEntry) {
+    if (entry.id === "today") {
+      clearTodayExamen();
+      return;
+    }
+
+    setTrailHistory(trailHistory.filter((item) => item.id !== entry.id));
+    if (selectedTrailId === entry.id) {
+      setSelectedTrailId(null);
+    }
+  }
+
   return (
     <section className="space-y-5">
       <SectionHeading
@@ -3980,11 +4583,13 @@ function TrailModule({
           draft={examenDraft}
           setDraft={setExamenDraft}
           saveExamen={saveExamen}
+          clearExamen={clearTodayExamen}
         />
         <TrailLog
           entries={trailEntries}
           selectedEntry={selectedEntry}
           setSelectedTrailId={setSelectedTrailId}
+          deleteTrailEntry={deleteTrailEntry}
         />
       </div>
     </section>
@@ -4009,6 +4614,11 @@ function MorningWaypoint({
       <p className="mt-4 text-xl font-semibold">
         What kind of terrain are you walking today?
       </p>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Terrain is a quick shorthand for the day&apos;s working conditions. It
+        helps Waypoint tune the pace and reflection prompts without turning the
+        check-in into a long form.
+      </p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {terrainOptions.map((option) => {
@@ -4020,19 +4630,28 @@ function MorningWaypoint({
               key={option.key}
               type="button"
               onClick={() => setTrail({ ...trail, terrain: option.key })}
+              aria-pressed={isSelected}
               className={`rounded-lg border p-4 text-left transition ${
                 isSelected
                   ? "border-[#2a7d8e] bg-[#edf8fa]"
                   : "border-[#dbe3e0] bg-[#fbfcfb] hover:border-[#9fcbd2]"
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
                 <Icon
                   className="h-5 w-5"
                   aria-hidden="true"
                   style={{ color: option.accent }}
                 />
                 <span className="font-semibold">{option.label}</span>
+                </span>
+                {isSelected ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-[#2a7d8e]">
+                    <Check className="h-3 w-3" aria-hidden="true" />
+                    Selected
+                  </span>
+                ) : null}
               </div>
               <p className="mt-2 text-sm leading-6 text-[#607286]">
                 {option.description}
@@ -4067,6 +4686,10 @@ function PaceCheck({
       <p className="mt-4 text-xl font-semibold">
         Are you moving at a sustainable pace?
       </p>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Pace records whether the day needs momentum, restraint, or a smaller
+        next step.
+      </p>
       <div className="mt-5 grid gap-2">
         {[
           { key: "yes", label: "Yes" },
@@ -4079,13 +4702,22 @@ function PaceCheck({
             onClick={() =>
               setTrail({ ...trail, pace: choice.key as PaceChoice })
             }
+            aria-pressed={trail.pace === choice.key}
             className={`rounded-lg border p-3 text-left text-sm font-semibold transition ${
               trail.pace === choice.key
                 ? "border-[#2a7d8e] bg-[#edf8fa]"
                 : "border-[#dbe3e0] bg-[#fbfcfb] hover:border-[#9fcbd2]"
             }`}
           >
-            {choice.label}
+            <span className="flex items-center justify-between gap-2">
+              {choice.label}
+              {trail.pace === choice.key ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-[#2a7d8e]">
+                  <Check className="h-3 w-3" aria-hidden="true" />
+                  Selected
+                </span>
+              ) : null}
+            </span>
           </button>
         ))}
       </div>
@@ -4113,11 +4745,13 @@ function ExamenCard({
   draft,
   setDraft,
   saveExamen,
+  clearExamen,
 }: {
   trail: TrailToday;
   draft: Examen;
   setDraft: (draft: Examen) => void;
   saveExamen: () => void;
+  clearExamen: () => void;
 }) {
   const hasText = draft.alive.trim() || draft.drained.trim() || draft.carry.trim();
 
@@ -4127,6 +4761,10 @@ function ExamenCard({
         <NotebookPen className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
         <h3 className="text-lg font-semibold">Examen</h3>
       </div>
+      <p className="mt-2 text-sm leading-6 text-[#607286]">
+        Save once to create today&apos;s trail marker. After that, edit these
+        fields and save again to revise the marker.
+      </p>
       <div className="mt-5 space-y-4">
         <ReflectionTextarea
           label="Where did you feel most alive today?"
@@ -4144,15 +4782,27 @@ function ExamenCard({
           onChange={(value) => setDraft({ ...draft, carry: value })}
         />
 
-        <button
-          type="button"
-          onClick={saveExamen}
-          disabled={!trail.terrain || !hasText}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1a2e4a] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#243f63] disabled:cursor-not-allowed disabled:bg-[#9aa8b6]"
-        >
-          <Save className="h-4 w-4" aria-hidden="true" />
-          Save reflection
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={saveExamen}
+            disabled={!trail.terrain || !hasText}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1a2e4a] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#243f63] disabled:cursor-not-allowed disabled:bg-[#9aa8b6]"
+          >
+            <Save className="h-4 w-4" aria-hidden="true" />
+            {trail.examen ? "Update reflection" : "Save reflection"}
+          </button>
+          {trail.examen ? (
+            <button
+              type="button"
+              onClick={clearExamen}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-[#f0d2cb] px-4 py-3 text-sm font-semibold text-[#9d5338] transition hover:bg-[#fff7f2]"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Clear reflection
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -4162,10 +4812,12 @@ function TrailLog({
   entries,
   selectedEntry,
   setSelectedTrailId,
+  deleteTrailEntry,
 }: {
   entries: TrailEntry[];
   selectedEntry: TrailEntry | null;
   setSelectedTrailId: (id: string) => void;
+  deleteTrailEntry: (entry: TrailEntry) => void;
 }) {
   return (
     <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
@@ -4186,6 +4838,7 @@ function TrailLog({
                   key={entry.id}
                   type="button"
                   onClick={() => setSelectedTrailId(entry.id)}
+                  aria-pressed={selectedEntry?.id === entry.id}
                   className={`relative w-full rounded-lg border bg-[#fbfcfb] p-3 text-left transition hover:border-[#9fcbd2] ${
                     selectedEntry?.id === entry.id
                       ? "border-[#2a7d8e]"
@@ -4205,6 +4858,12 @@ function TrailLog({
                   <span className="mt-1 block text-sm text-[#607286]">
                     {entry.word}
                   </span>
+                  {selectedEntry?.id === entry.id ? (
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-[#2a7d8e]">
+                      <Check className="h-3 w-3" aria-hidden="true" />
+                      Selected
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -4213,7 +4872,10 @@ function TrailLog({
 
         <div className="rounded-lg border border-[#e4ebe8] bg-[#fbfcfb] p-4">
           {selectedEntry ? (
-            <TrailEntryDetail entry={selectedEntry} />
+            <TrailEntryDetail
+              entry={selectedEntry}
+              deleteTrailEntry={deleteTrailEntry}
+            />
           ) : (
             <p className="text-sm leading-6 text-[#607286]">
               Select a marker to open the reflection.
@@ -4225,24 +4887,43 @@ function TrailLog({
   );
 }
 
-function TrailEntryDetail({ entry }: { entry: TrailEntry }) {
+function TrailEntryDetail({
+  entry,
+  deleteTrailEntry,
+}: {
+  entry: TrailEntry;
+  deleteTrailEntry: (entry: TrailEntry) => void;
+}) {
   const terrain = terrainMap[entry.terrain];
   const Icon = terrain.Icon;
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <Icon
-          className="h-5 w-5"
-          aria-hidden="true"
-          style={{ color: terrain.accent }}
-        />
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold">{terrain.label}</p>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a9aaa]">
-            {entry.dateLabel}
-          </p>
+          <div className="flex items-center gap-2">
+            <Icon
+              className="h-5 w-5"
+              aria-hidden="true"
+              style={{ color: terrain.accent }}
+            />
+            <div>
+              <p className="text-sm font-semibold">{terrain.label}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a9aaa]">
+                {entry.dateLabel}
+              </p>
+            </div>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={() => deleteTrailEntry(entry)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#f0d2cb] bg-white text-[#9d5338] transition hover:bg-[#fff7f2]"
+          aria-label="Delete trail entry"
+          title="Delete"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
       <div className="mt-4 space-y-4">
         <ReadOnlyReflection
