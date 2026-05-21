@@ -125,7 +125,6 @@ This document captures 10 new feature ideas for the Waypoint app and includes pr
 
 ## 10 cool new feature ideas
 
-Paused the push. Here are 10 feature ideas that would fit Waypoint well:
 
 1. **Downtime Loop Timer**
    A guided 30-minute cycle that steps through channel check, status line, learning task, visual break, and movement.
