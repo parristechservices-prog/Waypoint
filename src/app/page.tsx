@@ -227,6 +227,15 @@ type HubState = {
   connectionMove: string;
 };
 
+type HubNextMove = {
+  eyebrow: string;
+  title: string;
+  text: string;
+  cta: string;
+  Icon: LucideIcon;
+  onSelect: () => void;
+};
+
 const nervousOptions: NervousOption[] = [
   {
     label: "Flooded",
@@ -676,6 +685,65 @@ function HubSection({
   const nervous = anchor.nervous
     ? nervousOptions.find((option) => option.label === anchor.nervous)
     : null;
+  const focusHubField = (id: string) => {
+    const field = document.getElementById(id);
+    if (field instanceof HTMLTextAreaElement) {
+      field.focus();
+    }
+  };
+  const nextMove: HubNextMove = !anchor.locked
+    ? {
+        eyebrow: "Start here",
+        title: "Set today's anchor",
+        text: "Name the one meaningful thing and the boundary that protects the day before opening more loops.",
+        cta: "Set anchor",
+        Icon: Anchor,
+        onSelect: () => openWaypoint("anchor"),
+      }
+    : !trail.terrain
+      ? {
+          eyebrow: "Next step",
+          title: "Mark the terrain",
+          text: "Choose how the day feels so the rest of Waypoint can frame pace, load, and reflection around it.",
+          cta: "Open trail",
+          Icon: MapIcon,
+          onSelect: () => openWaypoint("trail"),
+        }
+      : !hub.growthFocus.trim()
+        ? {
+            eyebrow: "Make it useful",
+            title: "Choose one growth focus",
+            text: "Give the day a skill edge: one craft, support, communication, or troubleshooting move worth practising.",
+            cta: "Add growth focus",
+            Icon: Sprout,
+            onSelect: () => focusHubField("hub-growth-focus"),
+          }
+        : !hub.wellbeingGuardrail.trim()
+          ? {
+              eyebrow: "Protect capacity",
+              title: "Set a guardrail",
+              text: "Define the constraint that keeps the work sustainable before the day starts collecting interruptions.",
+              cta: "Add guardrail",
+              Icon: Shield,
+              onSelect: () => focusHubField("hub-wellbeing-guardrail"),
+            }
+          : !hub.learningMove.trim()
+            ? {
+                eyebrow: "Use quiet time",
+                title: "Pick a learning move",
+                text: "Choose one small, interruptible learning rep so downtime has a productive default.",
+                cta: "Add learning move",
+                Icon: BookOpen,
+                onSelect: () => focusHubField("hub-learning-move"),
+              }
+            : {
+                eyebrow: "Ready to run",
+                title: "Start the downtime loop",
+                text: "You have enough context for the day. Run the readiness loop to keep availability, movement, and evidence visible.",
+                cta: "Open controls",
+                Icon: Activity,
+                onSelect: openDowntime,
+              };
 
   function updateHub(field: keyof HubState, value: string) {
     setHub({ ...hub, [field]: value });
@@ -788,8 +856,11 @@ function HubSection({
         </div>
       </div>
 
+      <NextMoveCard move={nextMove} />
+
       <div className="grid gap-4 md:grid-cols-2">
         <HubPrompt
+          id="hub-growth-focus"
           icon={Sprout}
           title="Growth focus"
           value={hub.growthFocus}
@@ -797,6 +868,7 @@ function HubSection({
           onChange={(value) => updateHub("growthFocus", value)}
         />
         <HubPrompt
+          id="hub-wellbeing-guardrail"
           icon={Shield}
           title="Wellbeing guardrail"
           value={hub.wellbeingGuardrail}
@@ -804,6 +876,7 @@ function HubSection({
           onChange={(value) => updateHub("wellbeingGuardrail", value)}
         />
         <HubPrompt
+          id="hub-learning-move"
           icon={BookOpen}
           title="Learning move"
           value={hub.learningMove}
@@ -811,6 +884,7 @@ function HubSection({
           onChange={(value) => updateHub("learningMove", value)}
         />
         <HubPrompt
+          id="hub-connection-move"
           icon={Route}
           title="Connection move"
           value={hub.connectionMove}
@@ -886,13 +960,53 @@ function HubSection({
   );
 }
 
+function NextMoveCard({ move }: { move: HubNextMove }) {
+  const Icon = move.Icon;
+
+  return (
+    <div
+      className="rounded-lg border border-[#a9d7de] bg-[#edf8fa] p-5 shadow-sm"
+      aria-live="polite"
+    >
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="rounded-md bg-white p-2 text-[#2a7d8e] shadow-sm">
+            <Icon className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#2a7d8e]">
+              {move.eyebrow}
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-[#1a2e4a]">
+              {move.title}
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#607286]">
+              {move.text}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={move.onSelect}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-[#2a7d8e] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#246b79]"
+        >
+          <Route className="h-4 w-4" aria-hidden="true" />
+          {move.cta}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function HubPrompt({
+  id,
   icon: Icon,
   title,
   value,
   placeholder,
   onChange,
 }: {
+  id?: string;
   icon: LucideIcon;
   title: string;
   value: string;
@@ -906,6 +1020,7 @@ function HubPrompt({
         {title}
       </span>
       <textarea
+        id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
