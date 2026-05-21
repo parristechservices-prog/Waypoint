@@ -1,4 +1,4 @@
-# Local App Inventory
+# Local App Discovery Inventory
 
 Inventory refreshed from this computer on 2026-05-22.
 
@@ -75,7 +75,7 @@ Other local JoshHub game builds found:
 
 ## Appears Only as a Catalog Entry, Link, or Stale Path
 
-These names appear in JoshHub data files or older inventory data, but no matching active local source folder or static build was confirmed in today's scan.
+These names appear in JoshHub data files or older inventory data, but no matching active local source folder or static build was confirmed in the 2026-05-22 scan.
 
 | App or family | Local evidence | Status |
 | --- | --- | --- |
@@ -128,6 +128,6 @@ No local source folder or static build was found for these names during this pas
 
 ## Notes
 
-- Several local repositories have uncommitted local changes. I did not modify or clean those repositories during the inventory.
+- Several local repositories have uncommitted local changes. Those repositories were not modified or cleaned during the inventory.
 - JoshHub is the richest local bundle. It contains the main dashboard/catalog plus many static game builds that correspond to deployed links.
 - Some deployed apps are represented only by links in JoshHub. For those, the next recovery step would be cloning the matching GitHub repositories into a consistent local workspace.
