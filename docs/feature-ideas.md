@@ -120,3 +120,37 @@ This document captures 10 new feature ideas for the Waypoint app and includes pr
 - Optionally support a shareable query string or encoded state for easy copy/paste.
 - Keep the first version simple: generate share text and allow copy-to-clipboard.
 - This can be a natural extension of the existing task and reflection workflow.
+
+10 more ideas
+
+## 10 cool new feature ideas
+
+1. **Downtime Workflow Builder**
+   - Let users create and save custom 30-minute downtime loops from the briefing content (check channels, status line, task, visual break, movement).
+
+2. **Smart Reminder System**
+   - Add configurable reminders for posture changes, visual breaks, status updates, and walking intervals.
+
+3. **Daily Rhythm Dashboard**
+   - Visualise how often users switch posture, log tasks, and complete focus cycles over days/weeks.
+
+4. **Task Microlearning Library**
+   - Offer a curated menu of short low-switching-cost learning tasks (e.g. “React practice”, “ticket-note writing”, “cyber-safety reading”).
+
+5. **Status Line Journal**
+   - Capture quick availability/status lines and auto-organise them as a work log for later review.
+
+6. **Ergonomics Checklist**
+   - Add a guided monitor-and-workstation setup checklist with prompts for height, distance, lighting, and footwear.
+
+7. **Evidence & Reference Hub**
+   - Create a built-in source library that links briefing sections to the cited guidance and research sources.
+
+8. **Personalised Wellbeing Coach**
+   - Recommend controls based on current state: “static standing risk”, “low cognitive load”, “visual fatigue”.
+
+9. **Exportable Summary Report**
+   - Generate a PDF or text summary of the day’s anchor, task log, downtime controls used, and end-of-day reflections.
+
+10. **Collaboration / Sharing Mode**
+    - Allow users to share a daily wellbeing plan or status update with a manager, coach, or teammate via link or clipboard export.
