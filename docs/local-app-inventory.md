@@ -65,3 +65,37 @@ The following app/repo names were not detected within `C:\Users\joshua.parris` d
 - The scan was performed from the user's home directory and identified both root repos and embedded project folders.
 - Some matches were found in published output directories (`publish`, `web-deploy`) rather than active source trees.
 - If desired, this inventory can be extended with a deeper search into `OneDrive`, `JoshHub/archive`, or other storage locations.
+
+## GitHub Sync Status
+
+### Git-tracked repositories and comparison results
+- `C:\Users\joshua.parris\JoshHub`
+  - Remote: `https://github.com/joshualparris/JoshHub.git`
+  - Branch: `main`
+  - Local state: behind remote by 6 commits
+  - Notes: this local repo also contains working tree changes and untracked files.
+- `C:\Users\joshua.parris\NebulaDice-Browser-publish`
+  - Remote: `https://github.com/joshualparris/NebulaDice-Browser.git`
+  - Branch: `main`
+  - Local state: in sync with remote
+- `C:\Users\joshua.parris\Parris-Life-Dashboard-clean-publish`
+  - Remote: `https://github.com/joshualparris/Parris-Life-Dashboard.git`
+  - Branch: `main`
+  - Local state: behind remote by 7 commits
+- `C:\Users\joshua.parris\OneDrive - Dubbo Christian School\Documents\DCSPrepApp`
+  - Remote: `https://github.com/joshualparris/DCSPD.git`
+  - Branch: `main`
+  - Local state: in sync with remote
+
+### Paths without git repository metadata
+- `C:\Users\joshua.parris\JoshPath`
+- `C:\Users\joshua.parris\dev\NebulaDice`
+- `C:\Users\joshua.parris\Documents\NebulaDice`
+- `C:\Users\joshua.parris\Parris-Life-Dashboard-publish`
+- `C:\Users\joshua.parris\Parris-Life-Dashboard-web-deploy`
+- `C:\Users\joshua.parris\Downloads\dcsprep_surprise_6_json_files`
+
+### Notes
+- Many of the nested `JoshHub` folders are part of the same `JoshHub` git repository, not separate remotes.
+- The GitHub sync status was refreshed by fetching each repo's origin before checking branch ahead/behind counts.
+- The reported behind counts mean those local folders are missing commits that exist on the GitHub `origin/main` branch.
