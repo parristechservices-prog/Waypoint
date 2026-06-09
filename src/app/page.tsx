@@ -37,6 +37,7 @@ import {
   PhoneCall,
   Play,
   Plus,
+  Printer,
   RefreshCcw,
   Route,
   Save,
@@ -2623,7 +2624,7 @@ function ReportAndSharingPanel({
   }
 
   return (
-    <div className="rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
+    <div className="waypoint-report-card rounded-lg border border-[#dbe3e0] bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <NotebookPen className="h-5 w-5 text-[#2a7d8e]" aria-hidden="true" />
@@ -2650,8 +2651,9 @@ function ReportAndSharingPanel({
         rows={10}
         className="mt-5 w-full resize-none rounded-lg border border-[#dbe3e0] bg-[#fbfcfb] px-3 py-3 font-mono text-xs leading-5 outline-none"
       />
+      <pre className="waypoint-print-report">{report}</pre>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="waypoint-report-actions mt-4 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={copyReport}
@@ -2667,6 +2669,14 @@ function ReportAndSharingPanel({
         >
           <Save className="h-4 w-4" aria-hidden="true" />
           Download text
+        </button>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-[#dbe3e0] px-3 py-2 text-sm font-semibold text-[#607286] transition hover:bg-[#eef4f3]"
+        >
+          <Printer className="h-4 w-4" aria-hidden="true" />
+          Print / Save PDF
         </button>
         <a
           href={`mailto:?subject=${encodeURIComponent("Waypoint daily summary")}&body=${encodeURIComponent(report)}`}

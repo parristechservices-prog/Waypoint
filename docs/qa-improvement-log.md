@@ -44,7 +44,7 @@ This log records the QA-driven improvements made after reviewing the Growth Hub,
 - A stronger Growth Hub skill tracker with scenario practice and weekly planning.
 - Report fields for explicit unresolved items and skills practised instead of inferring them from logs.
 - Recent custom status templates based on lines the user actually writes.
-- Print/PDF report export and richer share options.
+- Richer share options beyond the implemented print/PDF report export.
 - Automated tests for local storage restore, report generation, timer behavior, and log edit/delete controls.
 
 ## Validation

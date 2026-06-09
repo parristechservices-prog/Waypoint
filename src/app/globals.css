@@ -113,6 +113,42 @@ button:disabled {
   }
 }
 
+.waypoint-print-report {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .waypoint-report-card,
+  .waypoint-report-card * {
+    visibility: visible;
+  }
+
+  .waypoint-report-card {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .waypoint-report-card textarea,
+  .waypoint-report-actions {
+    display: none;
+  }
+
+  .waypoint-print-report {
+    display: block;
+    margin-top: 24px;
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11pt;
+    line-height: 1.55;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

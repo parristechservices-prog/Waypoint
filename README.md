@@ -20,6 +20,7 @@ The latest implementation pass focused on the QA report in `docs/qa-improvement-
 - Added clear/delete controls for saved trail reflections.
 - Collapsed long Downtime evidence content behind an expandable details section.
 - Expanded local snapshot restore to include more downtime and wellbeing state.
+- Added print/PDF export for manager-ready and full-day reports.
 - Documented remaining work in the QA improvement log.
 
 ## Documentation

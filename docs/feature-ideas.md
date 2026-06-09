@@ -70,7 +70,7 @@ This document captures the 20 requested Waypoint feature ideas in top-to-bottom 
 - Creates a shareable day summary from anchor, task log, downtime controls, and reflections.
 - Implemented through `ReportAndSharingPanel`.
 - Status: implemented with Markdown preview, copy, text download, and email draft.
-- Remaining: add print/PDF export and explicit unresolved-item fields.
+- Status update: print/PDF export is available from the report panel; explicit unresolved-item fields remain.
 
 ## 10. Collaboration / Sharing Mode
 
