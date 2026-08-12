@@ -211,6 +211,8 @@ type EndOfDay = {
   didOneThing: DidOneThing;
   wentWell: string;
   leaveBehind: string;
+  unresolvedItems?: string;
+  skillsPractised?: string;
 };
 
 type AnchorData = {
@@ -4253,6 +4255,8 @@ function EndOfDay({
     didOneThing: "Partly",
     wentWell: "",
     leaveBehind: "",
+    unresolvedItems: "",
+    skillsPractised: "",
   });
 
   if (anchor.end) {
@@ -4300,6 +4304,16 @@ function EndOfDay({
           value={draft.leaveBehind}
           onChange={(value) => setDraft({ ...draft, leaveBehind: value })}
         />
+        <ReflectionTextarea
+          label="Unresolved items (Optional)"
+          value={draft.unresolvedItems || ""}
+          onChange={(value) => setDraft({ ...draft, unresolvedItems: value })}
+        />
+        <ReflectionTextarea
+          label="Skills practised (Optional)"
+          value={draft.skillsPractised || ""}
+          onChange={(value) => setDraft({ ...draft, skillsPractised: value })}
+        />
 
         <button
           type="button"
@@ -4328,6 +4342,8 @@ function FullDayCard({
       didOneThing: "Partly",
       wentWell: "",
       leaveBehind: "",
+      unresolvedItems: "",
+      skillsPractised: "",
     },
   );
   const nervous = anchor.nervous
@@ -4379,6 +4395,16 @@ function FullDayCard({
             label="What do you want to leave here?"
             value={draft.leaveBehind}
             onChange={(value) => setDraft({ ...draft, leaveBehind: value })}
+          />
+          <ReflectionTextarea
+            label="Unresolved items (Optional)"
+            value={draft.unresolvedItems || ""}
+            onChange={(value) => setDraft({ ...draft, unresolvedItems: value })}
+          />
+          <ReflectionTextarea
+            label="Skills practised (Optional)"
+            value={draft.skillsPractised || ""}
+            onChange={(value) => setDraft({ ...draft, skillsPractised: value })}
           />
           <div className="flex flex-wrap gap-2">
             <button
@@ -4461,6 +4487,18 @@ function FullDayCard({
           label="Left behind"
           value={anchor.end?.leaveBehind || "Not noted"}
         />
+        {anchor.end?.unresolvedItems ? (
+          <DayCardItem
+            label="Unresolved items"
+            value={anchor.end.unresolvedItems}
+          />
+        ) : null}
+        {anchor.end?.skillsPractised ? (
+          <DayCardItem
+            label="Skills practised"
+            value={anchor.end.skillsPractised}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -5236,6 +5274,12 @@ function buildManagerReadyReport(
     "",
     "## Work Evidence",
     taskLines || "- No task entries logged.",
+    "",
+    "## Explicit Unresolved Items",
+    anchor.end?.unresolvedItems || "- None explicitly tracked.",
+    "",
+    "## Skills Practised",
+    anchor.end?.skillsPractised || "- None explicitly tracked.",
     "",
     "## Downtime Controls Used",
     `- Completed loops: ${todaysEvents.filter((event) => event.type === "loopComplete").length}`,
