@@ -1,3 +1,4 @@
+import Script from "next/script";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -21,7 +22,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={geistSans.className}>{children}</body>
+      <body className={geistSans.className}>{children}<Script src="https://parris-analytics.parris-neathaustralia.workers.dev/tracker.js" strategy="afterInteractive" data-site="waypoint" />
+      </body>
     </html>
   );
 }
